@@ -50,7 +50,7 @@ interface AppState {
   messages: ChatMessage[];
   demo: { todayMode: TodayMode; billingProblem: boolean; offline: boolean };
 
-  submitIntake(answers: Record<string, unknown>, parqFlag: boolean): Promise<void>;
+  submitIntake(form: { id: string; version: number }, answers: Record<string, unknown>, parqFlag: boolean): Promise<void>;
   signWaiver(signedName: string, signatureSvg: string): Promise<void>;
   setNotificationsAsked(): void;
   startSession(plan: SessionPlan): Promise<string>;
@@ -90,8 +90,8 @@ export const useApp = create<AppState>()(
       ...seed(),
       demo: { todayMode: 'session', billingProblem: false, offline: false },
 
-      async submitIntake(answers, parqFlag) {
-        await syncQueue.enqueue('intake.submit', { responseId: uuidv7(), formId: 'default-v1', answers, parqFlag });
+      async submitIntake(form, answers, parqFlag) {
+        await syncQueue.enqueue('intake.submit', { responseId: uuidv7(), formId: form.id, formVersion: form.version, answers, parqFlag });
         set({ intake: { answers, parqFlag } });
       },
 

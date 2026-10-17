@@ -13,3 +13,4 @@ export * from './components/Basics';
 export * from './components/Sheet';
 export * from './components/Screen';
 export * from './AppProviders';
+export * from './components/IntakeFields';

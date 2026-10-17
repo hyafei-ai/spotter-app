@@ -110,7 +110,13 @@ export const Mutation = z.discriminatedUnion('kind', [
   z.object({
     ...base,
     kind: z.literal('intake.submit'),
-    payload: z.object({ responseId: uuid, formId: z.string(), answers: z.record(z.string(), z.unknown()), parqFlag: z.boolean() }),
+    payload: z.object({
+      responseId: uuid,
+      formId: z.string(),
+      formVersion: z.number().int().min(1).optional(),
+      answers: z.record(z.string(), z.unknown()),
+      parqFlag: z.boolean(),
+    }),
   }),
   z.object({
     ...base,

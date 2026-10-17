@@ -8,3 +8,4 @@ export * from './records';
 export * from './session';
 export * from './triage';
 export * from './sync/queue';
+export * from './intake';
