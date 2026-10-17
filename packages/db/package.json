@@ -1,0 +1,9 @@
+{
+  "name": "@spotter/db",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "bash scripts/test-local.sh",
+    "sync-schemas": "node scripts/sync-schemas.mjs"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "maya-reyes-strength": {
+    "id": "0192f0a0-0000-7000-8000-000000000001",
+    "slug": "maya-reyes-strength",
+    "appName": "Maya Reyes Strength",
+    "shortName": "MRS",
+    "brandColor": "#C2410C",
+    "units": "kg",
+    "weightIncrement": 2.5,
+    "coach": {
+      "name": "Maya Reyes",
+      "monogram": "MR",
+      "welcomeMessage": "Glad you’re here. We’ll start simple: tell me about your training, sign the waiver, and your first session is ready to go.",
+      "restDayLine": "A 20-minute walk is plenty today. Your legs did the work yesterday."
+    },
+    "supportEmail": "coach@mayareyes.example",
+    "privacyPolicyUrl": "https://mayareyes.example/privacy",
+    "modules": {
+      "nutrition": true,
+      "checkIns": true,
+      "formChecks": true,
+      "habits": true,
+      "storefront": false
+    },
+    "bundleIds": {
+      "ios": "com.spotter.mayareyes",
+      "android": "com.spotter.mayareyes"
+    },
+    "scheme": "mayareyes",
+    "updateChannel": "maya-reyes-strength"
+  },
+  "north-shore-barbell": {
+    "id": "0192f0a0-0000-7000-8000-000000000002",
+    "slug": "north-shore-barbell",
+    "appName": "North Shore Barbell",
+    "shortName": "NSB",
+    "brandColor": "#1D5C63",
+    "units": "lb",
+    "weightIncrement": 5,
+    "coach": {
+      "name": "Sam Okafor",
+      "monogram": "SO",
+      "welcomeMessage": "Welcome in. Fill in the intake honestly. It shapes your first block.",
+      "restDayLine": "Off day. Mobility list below if you feel like moving."
+    },
+    "supportEmail": "sam@northshorebarbell.example",
+    "privacyPolicyUrl": "https://northshorebarbell.example/privacy",
+    "modules": {
+      "nutrition": false,
+      "checkIns": true,
+      "formChecks": true,
+      "habits": true,
+      "storefront": false
+    },
+    "bundleIds": {
+      "ios": "com.spotter.northshorebarbell",
+      "android": "com.spotter.northshorebarbell"
+    },
+    "scheme": "northshorebarbell",
+    "updateChannel": "north-shore-barbell"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "installCommand": "corepack enable && pnpm install --frozen-lockfile",
+  "buildCommand": "bash scripts/build-web.sh",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/coach/(.*)", "destination": "/coach/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

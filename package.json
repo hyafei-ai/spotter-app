@@ -1,0 +1,20 @@
+{
+  "name": "spotter",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "client": "pnpm --filter @spotter/client start",
+    "coach": "pnpm --filter @spotter/coach start",
+    "format": "prettier --write .",
+    "icons": "python3 scripts/make-tenant-icons.py < packages/core/src/demo-tenants.json"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.11.9",
+    "typescript": "~6.0.3"
+  }
+}

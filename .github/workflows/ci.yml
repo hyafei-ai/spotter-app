@@ -1,0 +1,24 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm --filter @spotter/core test
+      - run: node packages/db/scripts/sync-schemas.mjs --check
+      - name: SQL migrations + RLS tests (local Postgres)
+        run: pnpm --filter @spotter/db test
+      - name: Web export (both apps)
+        run: bash scripts/build-web.sh
