@@ -23,7 +23,7 @@ pnpm client            # Expo dev server for the client app (TENANT_ID=north-sho
 pnpm coach             # coach app
 pnpm test              # core unit tests (Vitest) + SQL migrations/RLS tests on a throwaway local Postgres
 pnpm typecheck
-bash scripts/build-web.sh   # web preview: client at /, coach at /coach (what Vercel deploys)
+bash scripts/build-web.sh   # web preview: client at /, coach at /coach-app (what Vercel deploys)
 ```
 
 Without `EXPO_PUBLIC_SUPABASE_URL` the apps run in demo mode: sample data, a demo sync transport, and **Me → Demo controls** to show the screen states (offline, rest day, no program, payment problem).

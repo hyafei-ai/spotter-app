@@ -3,7 +3,7 @@
   "buildCommand": "bash scripts/build-web.sh",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/coach/(.*)", "destination": "/coach/index.html" },
+    { "source": "/coach-app/(.*)", "destination": "/coach-app/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

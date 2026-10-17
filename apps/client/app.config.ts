@@ -45,7 +45,7 @@ const config: ExpoConfig = {
   updates: { requestHeaders: { 'expo-channel-name': tenant.updateChannel } },
   extra: {
     tenant,
-    coachUrl: process.env.EXPO_PUBLIC_COACH_URL ?? '/coach',
+    coachUrl: process.env.EXPO_PUBLIC_COACH_URL ?? '/coach-app',
   },
 };
 
