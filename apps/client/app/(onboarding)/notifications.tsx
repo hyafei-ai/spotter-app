@@ -3,8 +3,10 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { Button, Text, margin, space, Screen } from '@spotter/ui';
-import { tenant } from '../../src/env';
+import { registerForPush } from '@spotter/ui/platform';
+import { APP_VERSION, tenant } from '../../src/env';
 import { todayPlan, useApp } from '../../src/store';
+import { usePulled } from '../../src/platform/pulled';
 
 /** Notification permission, asked after the waiver with a reason first (C-2). Then straight into the first workout. */
 export default function NotificationsAsk() {
@@ -18,7 +20,9 @@ export default function NotificationsAsk() {
     setBusy(true);
     if (ask && Platform.OS !== 'web') {
       try {
-        await Notifications.requestPermissionsAsync();
+        const { granted } = await Notifications.requestPermissionsAsync();
+        const tenantId = usePulled.getState().tenantId;
+        if (granted && tenantId) void registerForPush(tenantId, APP_VERSION);
       } catch {
         // Denied or unavailable: the app works without it; Me → Notifications explains how to turn it on.
       }

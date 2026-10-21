@@ -1,0 +1,48 @@
+# Client onboarding (C-1, C-2): invite link → consent → intake → waiver → notifications → first session.
+# Runs against a demo build (no EXPO_PUBLIC_SUPABASE_URL), so no account is created.
+# Run: maestro test .maestro/onboarding.yaml   (APP_ID defaults to the demo tenant's bundle id)
+appId: ${APP_ID || 'com.spotter.mayareyes'}
+name: Client onboarding
+tags: [client, onboarding]
+---
+- launchApp:
+    clearState: true
+- openLink: mayareyes://join?t=tok_invite_123456&tenant=maya-reyes-strength&e=sam.lee%40example.com
+- assertVisible: Joining as sam.lee@example.com
+- assertVisible: Tick the box above to continue.
+- tapOn:
+    text: I agree to the privacy policy.*
+- tapOn: Get started
+
+# Intake
+- tapOn: Strength
+- tapOn: '3'
+- tapOn: Full gym
+- repeat:
+    while:
+      visible:
+        text: 'No'
+        selected: false
+    commands:
+      - tapOn:
+          text: 'No'
+          selected: false
+      - scroll
+- scrollUntilVisible:
+    element: Save and continue
+- tapOn: Save and continue
+
+# Waiver
+- tapOn: Your full name
+- inputText: Jordan Ellis
+- swipe:
+    start: 20%, 55%
+    end: 80%, 50%
+- scrollUntilVisible:
+    element: Sign waiver
+- tapOn: Sign waiver
+
+# Notifications pre-prompt, then Today
+- tapOn: Not now
+- assertVisible:
+    text: Log set 1.*

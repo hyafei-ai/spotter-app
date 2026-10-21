@@ -1,0 +1,36 @@
+# Coach triage (K-1): the Needs-you list, swipe actions with their button alternatives, undo,
+# and a bulk message to a filtered group.
+# Run: maestro test .maestro/coach-triage.yaml   (demo coach build)
+appId: ${COACH_APP_ID || 'app.spotter.coach'}
+name: Coach triage
+tags: [coach, triage]
+---
+- launchApp:
+    clearState: true
+- assertVisible: Needs you
+- assertVisible: Priya Natarajan
+
+# Button alternative to the swipe: the actions sheet
+- tapOn: Actions for Priya Natarajan
+- tapOn: Mark handled
+- assertNotVisible: Priya Natarajan
+- tapOn: Undo
+- assertVisible: Priya Natarajan
+
+# Swipe left reveals Snooze / Handled
+- swipe:
+    from:
+      text: Jordan Ellis
+    direction: LEFT
+- tapOn: Handled
+- assertNotVisible: Jordan Ellis
+- tapOn: Undo
+
+# Bulk message to everyone in the current filter
+- tapOn: All
+- tapOn:
+    text: Message these \d+ clients
+- tapOn: Message
+- inputText: Gym closes early on Friday.
+- tapOn:
+    text: Send to \d+ clients

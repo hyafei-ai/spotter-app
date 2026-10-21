@@ -21,38 +21,61 @@ export interface ListRowProps {
 
 export function ListRow({ title, subtitle, reason, left, right, chevron, onPress, accessibilityLabel, accessibilityHint, last }: ListRowProps) {
   const { colors } = useTheme();
-  const body = (
-    <View style={[styles.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line }]}>
-      {left}
-      <View style={styles.text}>
-        <Text variant="bodyStrong" numberOfLines={2}>
-          {title}
+  const divider = !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line };
+  const text = (
+    <View style={styles.text}>
+      <Text variant="bodyStrong" numberOfLines={2}>
+        {title}
+      </Text>
+      {reason ? (
+        <Text variant="callout" style={{ color: colors.brand }}>
+          {reason}
         </Text>
-        {reason ? (
-          <Text variant="callout" style={{ color: colors.brand }}>
-            {reason}
-          </Text>
-        ) : null}
-        {subtitle ? (
-          <Text variant="callout" color="ink2">
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-      {right}
-      {chevron ? <Feather name="chevron-right" size={20} color={colors.ink2} /> : null}
+      ) : null}
+      {subtitle ? (
+        <Text variant="callout" color="ink2">
+          {subtitle}
+        </Text>
+      ) : null}
     </View>
   );
-  if (!onPress) return body;
+  const chevronIcon = chevron ? <Feather name="chevron-right" size={20} color={colors.ink2} /> : null;
+  const a11y = {
+    accessibilityRole: 'button' as const,
+    accessibilityLabel: accessibilityLabel ?? [title, reason, subtitle].filter(Boolean).join(', '),
+    accessibilityHint,
+  };
+
+  if (!onPress) {
+    return (
+      <View style={[styles.row, divider]}>
+        {left}
+        {text}
+        {right}
+        {chevronIcon}
+      </View>
+    );
+  }
+  if (right) {
+    // `right` may hold its own button: keep it outside the row's button so controls aren't nested.
+    return (
+      <View style={[styles.split, divider]}>
+        <Pressable onPress={onPress} {...a11y} style={({ pressed }) => [styles.splitMain, { backgroundColor: pressed ? colors.surface : 'transparent' }]}>
+          {left}
+          {text}
+        </Pressable>
+        {right}
+        {chevronIcon}
+      </View>
+    );
+  }
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? [title, reason, subtitle].filter(Boolean).join(', ')}
-      accessibilityHint={accessibilityHint}
-      style={({ pressed }) => ({ backgroundColor: pressed ? colors.surface : 'transparent' })}
-    >
-      {body}
+    <Pressable onPress={onPress} {...a11y} style={({ pressed }) => ({ backgroundColor: pressed ? colors.surface : 'transparent' })}>
+      <View style={[styles.row, divider]}>
+        {left}
+        {text}
+        {chevronIcon}
+      </View>
     </Pressable>
   );
 }
@@ -67,4 +90,6 @@ const styles = StyleSheet.create({
     gap: space[3],
   },
   text: { flex: 1, gap: 2 },
+  split: { marginHorizontal: margin, flexDirection: 'row', alignItems: 'center', gap: space[3] },
+  splitMain: { flex: 1, minHeight: rowMin, paddingVertical: space[3], flexDirection: 'row', alignItems: 'center', gap: space[3] },
 });

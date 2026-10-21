@@ -33,7 +33,11 @@ export function Stepper({ label, value, step, min = 0, max = 9999, format = Stri
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel={label}
-      accessibilityValue={{ text: spoken }}
+      accessibilityValue={{ min, max, now: value, text: spoken }}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      aria-valuetext={spoken}
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       onAccessibilityAction={(e) => set(e.nativeEvent.actionName === 'increment' ? value + step : value - step)}
       style={[styles.wrap, { borderColor: colors.line, backgroundColor: colors.surface }]}

@@ -3,7 +3,7 @@ import expoConfig from 'eslint-config-expo/flat.js';
 import tseslint from 'typescript-eslint';
 
 export default [
-  { ignores: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/.expo/**', 'packages/db/supabase/functions/**'] },
+  { ignores: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/.expo/**', '**/next-env.d.ts', 'packages/db/supabase/functions/**'] },
   ...expoConfig,
   ...tseslint.configs.recommended,
   {

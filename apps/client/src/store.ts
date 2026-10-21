@@ -13,7 +13,8 @@ import {
 import { DEMO_HISTORY, LOWER_A, isoDay, type PastSession } from '@spotter/core/demo';
 import { kv, clearLocalData } from './storage';
 import { syncQueue } from './sync';
-import { APP_VERSION } from './env';
+import { APP_VERSION, IS_DEMO } from './env';
+import { currentThreadId, usePulled } from './platform/pulled';
 
 export interface ActiveSession {
   sessionId: string;
@@ -36,6 +37,12 @@ export interface ChatMessage {
   body: string;
   sentAt: string;
   mutationId: string | null;
+  /** Attachments and receipts (platform): absent on plain text messages. */
+  kind?: 'text' | 'voice' | 'image' | 'link';
+  mediaUri?: string | null;
+  durationMs?: number | null;
+  link?: { type: 'session' | 'form_check' | 'program'; id: string; title: string } | null;
+  readAt?: string | null;
 }
 
 export type TodayMode = 'session' | 'rest' | 'none';
@@ -194,7 +201,7 @@ export const useApp = create<AppState>()(
       async sendMessage(body) {
         const id = uuidv7();
         const sentAt = new Date().toISOString();
-        const m = await syncQueue.enqueue('message.send', { messageId: id, threadId: '0192f0a1-0000-7000-8000-000000000002', body, sentAt });
+        const m = await syncQueue.enqueue('message.send', { messageId: id, threadId: currentThreadId(), body, sentAt });
         set({ messages: [...get().messages, { id, from: 'client', body, sentAt, mutationId: m.clientMutationId }] });
         void syncQueue.flush();
       },
@@ -220,6 +227,7 @@ export const useApp = create<AppState>()(
 
 /** Today's plan for the demo. Real builds read the client's assignment from the local cache. */
 export function todayPlan(mode: TodayMode): SessionPlan | null {
+  if (!IS_DEMO) return usePulled.getState().nextPlan;
   return mode === 'session' ? { ...LOWER_A, scheduledDate: isoDay(0) } : null;
 }
 

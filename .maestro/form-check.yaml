@@ -1,0 +1,18 @@
+# Form check (C-5) — STUB. The recording and upload screens belong to the form-check builder;
+# this flow only proves the entry point exists and the thread accepts a form-check link.
+# Fill in the record → trim → send steps once that screen lands.
+# Run: maestro test .maestro/form-check.yaml
+appId: ${APP_ID || 'com.spotter.mayareyes'}
+name: Form check (stub)
+tags: [client, form-check, stub]
+---
+- launchApp
+- tapOn: Coach
+- tapOn: Attach a voice note, photo or workout
+- assertVisible: A workout
+- tapOn: A workout
+- tapOn:
+    text: Lower A · .*
+- assertVisible:
+    text: 'Open Workout: Lower A.*'
+# TODO(form-check builder): record a clip, pick the exercise, send, then assert "Waiting for review".

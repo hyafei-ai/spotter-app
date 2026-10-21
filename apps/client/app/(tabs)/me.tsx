@@ -33,26 +33,15 @@ export default function Me() {
       <ScreenHeader title="Me" />
       <ListRow title={DEMO_CLIENT.name} subtitle={DEMO_CLIENT.email} />
       <ListRow title="Units" subtitle={tenant.units === 'kg' ? 'Kilograms (set by your coach)' : 'Pounds (set by your coach)'} />
-      <ListRow title="Notifications" subtitle="Coach replies, rest timer, check-in reminders" chevron onPress={() => void Linking.openSettings()} />
       {/* MOCK: plan status comes from subscriptions; the Stripe billing portal link arrives with payments (phase 7). */}
       <ListRow title="Plan" subtitle="Online coaching · monthly · billing is managed on the web" />
       <ListRow
         title="Signed waiver"
         subtitle={waiver ? `Signed by ${waiver.signedName}, ${new Date(waiver.signedAt).toLocaleDateString()}` : 'Not signed yet'}
       />
-      <ListRow title="Export my data" subtitle="CSV and PDFs, sent to your email" chevron onPress={() => Alert.alert('Export my data', 'Export arrives in a later build.')} />
       <ListRow title="Privacy policy" chevron onPress={() => void Linking.openURL(tenant.privacyPolicyUrl)} />
-      <ListRow
-        title="Delete account"
-        subtitle="Removes your training data. Your signed waiver may be kept where the law requires it."
-        last
-        onPress={() =>
-          confirm('Delete account', IS_DEMO ? 'Demo build: this clears the data on this phone and starts over.' : 'This can’t be undone.', () => {
-            void resetDemo().then(() => router.replace('/'));
-          })
-        }
-      />
 
+      {/* Notifications, Export my data and Delete account come from MeRows (platform). */}
       <MeRows />
 
       {IS_DEMO ? (

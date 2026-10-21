@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -20,7 +20,12 @@ import {
   space,
 } from '@spotter/ui';
 import type { DemoClient } from '@spotter/core/demo';
+import { getAuth, useAuth, useTriageRealtime } from '@spotter/ui/platform';
 import { initials, useCoach } from '../../src/store';
+import { tenant } from '../../src/env';
+import { SwipeRow } from '../../src/platform/SwipeRow';
+import { useVisibleClientIds } from '../../src/platform/team';
+import { loadCoachData, saveTriage } from '../../src/platform/serverData';
 
 type Filter = 'needs' | 'all' | 'new' | 'paused' | 'payment';
 const FILTERS: { value: Filter; label: string }[] = [
@@ -35,10 +40,20 @@ const FILTERS: { value: Filter; label: string }[] = [
 export default function Clients() {
   const { colors } = useTheme();
   const toast = useToast();
-  const { clients, triage, markHandled, restore, snooze } = useCoach();
+  const { clients: allClients, triage: allTriage, markHandled, restore, snooze } = useCoach();
   const [filter, setFilter] = useState<Filter>('needs');
   const [query, setQuery] = useState('');
   const [actionsFor, setActionsFor] = useState<DemoClient | null>(null);
+  const auth = useAuth();
+
+  // Assistants see only their assigned clients (K-8). Connected builds get this from RLS as well.
+  const visible = useVisibleClientIds();
+  const clients = useMemo(() => (visible ? allClients.filter((c) => visible.has(c.id)) : allClients), [allClients, visible]);
+  const triage = useMemo(() => (visible ? allTriage.filter((t) => visible.has(t.clientId)) : allTriage), [allTriage, visible]);
+
+  // Live: triage:<tenant_id>:<coach_id> refreshes the list when anything changes (connected builds).
+  const refresh = useCallback(() => void loadCoachData().catch(() => {}), []);
+  useTriageRealtime(auth.status === 'signedIn' ? tenant.id : null, auth.userId, refresh);
 
   const rows = useMemo(() => buildTriage(triage), [triage]);
   const byClient = new Map(rows.map((r) => [r.clientId, r]));
@@ -64,7 +79,16 @@ export default function Clients() {
   const handled = (c: DemoClient) => {
     const items = markHandled(c.id);
     setActionsFor(null);
-    toast({ message: `${c.name.split(' ')[0]} marked handled`, actionLabel: 'Undo', onAction: () => restore(items) });
+    const ids = items.map((i) => i.id);
+    void saveTriage(ids, { handled_at: new Date().toISOString(), handled_by: getAuth().userId });
+    toast({
+      message: `${c.name.split(' ')[0]} marked handled`,
+      actionLabel: 'Undo',
+      onAction: () => {
+        restore(items);
+        void saveTriage(ids, { handled_at: null, handled_by: null });
+      },
+    });
   };
 
   const snoozeFor = (c: DemoClient, days: number, label: string) => {
@@ -72,6 +96,10 @@ export default function Clients() {
     until.setDate(until.getDate() + days);
     until.setHours(7, 0, 0, 0);
     snooze(c.id, until);
+    void saveTriage(
+      triage.filter((t) => t.clientId === c.id && !t.handledAt).map((t) => t.id),
+      { snoozed_until: until.toISOString() },
+    );
     setActionsFor(null);
     toast({ message: `${c.name.split(' ')[0]} snoozed until ${label.toLowerCase()}` });
   };
@@ -80,7 +108,11 @@ export default function Clients() {
 
   return (
     <Screen scroll={false}>
-      <ScreenHeader title="Clients" subtitle={needCount ? `${needCount} need you today` : 'Nobody needs you right now'} />
+      <ScreenHeader
+        title="Clients"
+        subtitle={needCount ? `${needCount} need you today` : 'Nobody needs you right now'}
+        right={<IconButton icon="user-plus" label="Invite a client" onPress={() => router.push('/invite')} />}
+      />
       <View style={styles.search}>
         <TextField label="Search clients" value={query} onChangeText={setQuery} placeholder="Name" autoCorrect={false} returnKeyType="search" />
       </View>
@@ -104,8 +136,25 @@ export default function Clients() {
           })}
         </ScrollView>
       </View>
+      {list.length > 1 ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() =>
+            router.push(
+              `/bulk-message?ids=${list.map((r) => r.client.id).join(',')}&label=${encodeURIComponent(q ? 'matching clients' : (FILTERS.find((f) => f.value === filter)?.label ?? 'clients'))}`,
+            )
+          }
+          style={styles.bulk}
+          hitSlop={4}
+        >
+          <Feather name="send" size={16} color={colors.brand} />
+          <Text variant="bodyStrong" style={{ color: colors.brand }}>
+            Message these {list.length} clients
+          </Text>
+        </Pressable>
+      ) : null}
       {clients.length === 0 ? (
-        <EmptyState message="No clients yet. Send your first invite and they’ll show up here." />
+        <EmptyState message="No clients yet. Send your first invite and they’ll show up here." actionLabel="Invite a client" onAction={() => router.push('/invite')} />
       ) : list.length === 0 ? (
         <EmptyState
           message={filter === 'needs' && !q ? 'All clear. Nobody needs you right now.' : 'No clients match.'}
@@ -122,16 +171,32 @@ export default function Clients() {
           renderItem={({ item, index }) => {
             const t = item.triage;
             const more = t && t.items.length > 1 ? `+${t.items.length - 1} more · ` : '';
+            const c = item.client;
             return (
-              <ListRow
-                left={<Monogram initials={initials(item.client.name)} size={40} />}
-                title={item.client.name}
-                reason={t ? reasonText(t.top) : undefined}
-                subtitle={`${more}${item.client.status === 'paused' ? 'Paused · ' : ''}${item.client.plan}`}
-                onPress={() => router.push(`/client/${item.client.id}`)}
-                right={<IconButton icon="more-horizontal" label={`Actions for ${item.client.name}`} onPress={() => setActionsFor(item.client)} />}
-                last={index === list.length - 1}
-              />
+              <SwipeRow
+                left={[{ label: 'Reply', icon: 'message-square', tone: 'brand', onPress: () => router.push(`/client/${c.id}/thread`) }]}
+                right={
+                  t
+                    ? [
+                        { label: 'Snooze', icon: 'clock', tone: 'ink', onPress: () => snoozeFor(c, 1, 'Tomorrow') },
+                        { label: 'Handled', icon: 'check', tone: 'success', onPress: () => handled(c) },
+                      ]
+                    : undefined
+                }
+              >
+                <View style={{ backgroundColor: colors.paper }}>
+                  <ListRow
+                    left={<Monogram initials={initials(c.name)} size={40} />}
+                    title={c.name}
+                    reason={t ? reasonText(t.top) : undefined}
+                    subtitle={`${more}${c.status === 'paused' ? 'Paused · ' : ''}${c.plan}`}
+                    onPress={() => router.push(`/client/${c.id}`)}
+                    accessibilityHint="Swipe right to reply, left to mark handled or snooze. Actions are also in the more button."
+                    right={<IconButton icon="more-horizontal" label={`Actions for ${c.name}`} onPress={() => setActionsFor(c)} />}
+                    last={index === list.length - 1}
+                  />
+                </View>
+              </SwipeRow>
             );
           }}
         />
@@ -166,5 +231,6 @@ export default function Clients() {
 const styles = StyleSheet.create({
   search: { paddingHorizontal: margin, paddingBottom: space[3] },
   chips: { paddingHorizontal: margin, gap: space[2], paddingBottom: space[3] },
-  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: space[4], minHeight: 40, justifyContent: 'center' },
+  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: space[4], minHeight: 44, justifyContent: 'center' },
+  bulk: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingHorizontal: margin, minHeight: 44, alignSelf: 'flex-start' },
 });

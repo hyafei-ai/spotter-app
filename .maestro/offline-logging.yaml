@@ -1,0 +1,30 @@
+# Offline logging (C-4, offline-first NFR): sets logged in airplane mode stay on the device across
+# a restart, the banner says they're waiting, and they sync once the network is back.
+# Needs a device that allows airplane-mode toggling (Android emulator). Works on demo and connected builds.
+# Run: maestro test .maestro/offline-logging.yaml
+appId: ${APP_ID || 'com.spotter.mayareyes'}
+name: Offline logging
+tags: [client, offline]
+---
+- launchApp
+- assertVisible:
+    text: Log set 1.*
+- setAirplaneMode: enabled
+- assertVisible: Saved on phone, will sync
+- tapOn:
+    text: Log set 1.*
+- tapOn:
+    text: Log set 2.*
+# Kill and relaunch while offline: the logged sets must still be there.
+- stopApp
+- launchApp
+- assertVisible:
+    text: Set 1, .*logged.*
+- assertVisible:
+    text: Set 2, .*logged.*
+- assertVisible: Saved on phone, will sync
+- setAirplaneMode: disabled
+- extendedWaitUntil:
+    notVisible: Saved on phone, will sync
+    timeout: 15000
+- tapOn: Finish session

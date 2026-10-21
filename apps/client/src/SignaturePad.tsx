@@ -73,6 +73,7 @@ export function SignaturePad({ onChange }: { onChange: (svg: string | null) => v
           size.current = { w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height };
         }}
         accessible
+        accessibilityRole="image"
         accessibilityLabel={strokes.length ? 'Signature drawn' : 'Signature area. Draw your signature with one finger.'}
         style={[styles.pad, { borderColor: colors.line, backgroundColor: colors.surface }]}
       >
