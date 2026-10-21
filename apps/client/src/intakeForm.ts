@@ -7,11 +7,12 @@ import { tenant } from './env';
  * MOCK: the demo reads the form the coach app saved on this device (on the web preview both apps
  * share an origin, so edits in the coach app show up here), else the starter form.
  */
-export const INTAKE_FORM_KEY = `spotter.intakeForm.${tenant.slug}`;
+// A function, not a constant: in the shared app the tenant is chosen at runtime.
+export const intakeFormKey = () => `spotter.intakeForm.${tenant.slug}`;
 
 export async function loadIntakeForm(): Promise<IntakeForm> {
   try {
-    const raw = await kv.getItem(INTAKE_FORM_KEY);
+    const raw = await kv.getItem(intakeFormKey());
     if (raw) {
       const parsed = IntakeForm.safeParse(JSON.parse(raw));
       if (parsed.success) return parsed.data;

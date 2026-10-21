@@ -4,6 +4,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/coach-app/(.*)", "destination": "/coach-app/index.html" },
+    { "source": "/shared/(.*)", "destination": "/shared/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

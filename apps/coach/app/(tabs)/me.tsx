@@ -12,8 +12,6 @@ export default function Me() {
     <Screen>
       <ScreenHeader title="Me" />
       <ListRow left={<Monogram initials={tenant.coach.monogram} size={40} />} title={tenant.coach.name} subtitle={`Owner · ${tenant.appName}`} />
-      <ListRow title="Brand" subtitle={`${tenant.appName} · accent ${tenant.brandColor} · ${tenant.units}`} />
-      <ListRow title="Client app" subtitle="Not published yet. Clients can use the shared Spotter app with your code in the meantime." />
       <SectionLabel>Onboarding</SectionLabel>
       <ListRow
         title="Intake form"

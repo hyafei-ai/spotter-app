@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "lib": ["ES2022", "DOM"], "types": [], "paths": { "@/*": ["./src/*"] } },
-  "include": ["app", "src", "app.config.ts", "expo-env.d.ts"]
+  "include": ["app", "src", "app.config.ts", "expo-env.d.ts", "config-env.d.ts"]
 }
