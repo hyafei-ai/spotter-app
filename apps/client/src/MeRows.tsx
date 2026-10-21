@@ -1,4 +1,5 @@
 import { HealthRow } from './health/HealthRow';
+import { PlanRow, ReferralRow } from './billing/BillingRows';
 
 /**
  * Extra rows on the client's Me tab (C-10): health app, billing, export, delete, etc.
@@ -7,6 +8,8 @@ import { HealthRow } from './health/HealthRow';
 const ME_ROWS: React.ComponentType[] = [
   // feature rows
   HealthRow,
+  PlanRow,
+  ReferralRow,
 ];
 
 export function MeRows() {
