@@ -33,11 +33,12 @@ export async function loadCoachData(): Promise<void> {
       thisWeek: { planned: 0, done: 0 },
       lastSession: null,
     }));
-  const items: TriageItem[] = (triage.data ?? []).map((t: { id: string; client_id: string; reason_code: TriageReason; detail: { count?: number }; since: string; snoozed_until: string | null; handled_at: string | null }) => ({
+  const items: TriageItem[] = (triage.data ?? []).map((t: { id: string; client_id: string; reason_code: TriageReason; detail: { count?: number; text?: string }; since: string; snoozed_until: string | null; handled_at: string | null }) => ({
     id: t.id,
     clientId: t.client_id,
     reason: t.reason_code,
     count: t.detail?.count,
+    detail: t.detail?.text,
     since: t.since,
     snoozedUntil: t.snoozed_until,
     handledAt: t.handled_at,

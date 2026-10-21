@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { create } from 'zustand';
 import { DEFAULT_LIGHTER, LighterRule, dailyRead, sharedRead } from '@spotter/core';
 import {
   DEMO_CLIENT,
@@ -77,4 +78,27 @@ export function useLighterRule(clientId: string): [LighterRule, (r: LighterRule)
     await writeShared(lighterKey(tenant.slug), { ...rules, [clientId]: r });
   };
   return [rule, save];
+}
+
+/* ---------- synchronous access for coach memory and triage ---------- */
+
+interface ReadsCache {
+  doc: SharedReadsDoc | null;
+  load(): Promise<void>;
+}
+
+/** The shared-reads document, loaded once and refreshed when the client app writes to it. */
+export const useReadsDoc = create<ReadsCache>((set) => ({
+  doc: null,
+  async load() {
+    set({ doc: await readShared<SharedReadsDoc>(readsKey(tenant.slug), EMPTY_SHARED_READS) });
+  },
+}));
+onSharedChange((key) => {
+  if (key === readsKey(tenant.slug)) void useReadsDoc.getState().load();
+});
+
+/** Shared reads for one client, oldest first; the seeded sample until the client app has written any. */
+export function getSharedReads(clientId: string): SharedReadEntry[] {
+  return useReadsDoc.getState().doc?.reads?.[clientId] ?? seeded(clientId);
 }

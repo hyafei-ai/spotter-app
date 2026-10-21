@@ -10,6 +10,9 @@ export const TRIAGE_PRIORITY: Record<TriageReason, number> = {
   missed_sessions: 50,
   churn_risk: 40,
   new_client: 30,
+  follow_up_due: 65,
+  sleep_short_streak: 45,
+  load_spike: 42,
 };
 
 export interface TriageItem {
@@ -18,6 +21,8 @@ export interface TriageItem {
   reason: TriageReason;
   /** Count for "Missed 2 sessions", or similar. */
   count?: number;
+  /** Words for reasons that carry their own text, e.g. a follow-up ("Ask about knee"). */
+  detail?: string;
   since: string;
   snoozedUntil: string | null;
   handledAt: string | null;
@@ -46,9 +51,16 @@ export function reasonText(item: TriageItem, now: number = Date.now()): string {
     case 'missed_sessions':
       return `Missed ${item.count ?? 1} session${(item.count ?? 1) === 1 ? '' : 's'}`;
     case 'churn_risk':
-      return 'Hasn’t opened the app in 7 days';
+      // Coach-facing wording: about checking in, never churn (docs/jtbd.md).
+      return 'Quiet for a week: worth a check-in';
     case 'new_client':
       return 'New client';
+    case 'follow_up_due':
+      return `Follow-up: ${item.detail ?? 'see your notes'}`;
+    case 'sleep_short_streak':
+      return item.detail ?? `Short sleep ${item.count ?? 3} nights`;
+    case 'load_spike':
+      return item.detail ?? 'Training load jumped this week';
   }
 }
 

@@ -117,7 +117,7 @@ export default function Logger() {
       durationS: e.metric === 'time' ? (p?.durationS ?? 30) : null,
       distanceM: e.metric === 'distance' ? (p?.distanceM ?? 20) : null,
     };
-  }, [current, logged, completed, session?.keptLoad]);
+  }, [current, logged, completed, session?.keptLoad, session?.variant]);
   const [edited, setEdited] = useState<{ key: SetKey; entry: Entry } | null>(null);
   const entry = current && edited?.key === current.key ? edited.entry : defaults;
   const setEntry = (e: Entry) => current && setEdited({ key: current.key, entry: e });
