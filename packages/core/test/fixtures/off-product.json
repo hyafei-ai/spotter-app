@@ -1,0 +1,28 @@
+{
+  "_fixture": "Hand-written in the shape of Open Food Facts API v2 GET /api/v2/product/{code}.json. Product and values are invented test data, not a recorded response (the build sandbox can't reach the API).",
+  "code": "5000000000012",
+  "status": 1,
+  "status_verbose": "product found",
+  "product": {
+    "code": "5000000000012",
+    "product_name": "Fixture oat bar",
+    "generic_name": "Oat bar with peanuts",
+    "brands": "Fixture Foods, Example Group",
+    "quantity": "4 x 40 g",
+    "serving_size": "1 bar (40 g)",
+    "serving_quantity": "40",
+    "nutriments": {
+      "energy_100g": 1820,
+      "energy_unit": "kJ",
+      "energy-kj_100g": 1820,
+      "energy-kcal_100g": 435,
+      "fat_100g": 18.5,
+      "saturated-fat_100g": 3.1,
+      "carbohydrates_100g": 52,
+      "sugars_100g": 21,
+      "fiber_100g": 6.4,
+      "proteins_100g": 11.2,
+      "salt_100g": 0.4
+    }
+  }
+}

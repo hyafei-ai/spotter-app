@@ -130,6 +130,33 @@ export const Mutation = z.discriminatedUnion('kind', [
       appVersion: z.string(),
     }),
   }),
+  // Nutrition (C-8). Kept inline so this file stays self-contained for the Edge Functions copy.
+  z.object({
+    ...base,
+    kind: z.literal('food.log'),
+    payload: z.object({
+      logId: uuid,
+      date: isoDate,
+      meal: z.enum(['breakfast', 'lunch', 'dinner', 'snack']),
+      foodId: z.string().max(80).nullable(),
+      name: z.string().min(1).max(120),
+      grams: z.number().min(0).max(5000).nullable(),
+      kcal: z.number().min(0).max(10000),
+      proteinG: z.number().min(0).max(1000),
+      carbsG: z.number().min(0).max(1000),
+      fatG: z.number().min(0).max(1000),
+      portions: z
+        .object({ protein: z.number().min(0), carbs: z.number().min(0), fat: z.number().min(0), veg: z.number().min(0) })
+        .nullable(),
+      loggedAt: isoDateTime,
+    }),
+  }),
+  z.object({ ...base, kind: z.literal('food.delete'), payload: z.object({ logId: uuid, deletedAt: isoDateTime }) }),
+  z.object({
+    ...base,
+    kind: z.literal('habit.check'),
+    payload: z.object({ habitId: z.string().min(1).max(80), date: isoDate, done: z.boolean(), checkedAt: isoDateTime }),
+  }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];
