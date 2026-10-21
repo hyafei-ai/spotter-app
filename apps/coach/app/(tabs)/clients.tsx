@@ -26,6 +26,8 @@ import { tenant } from '../../src/env';
 import { SwipeRow } from '../../src/platform/SwipeRow';
 import { useVisibleClientIds } from '../../src/platform/team';
 import { loadCoachData, saveTriage } from '../../src/platform/serverData';
+import { PrepCard } from '../../src/memory/PrepCard';
+import { useMemoryTriage } from '../../src/memory/useClientMemory';
 
 type Filter = 'needs' | 'all' | 'new' | 'paused' | 'payment';
 const FILTERS: { value: Filter; label: string }[] = [
@@ -44,7 +46,10 @@ export default function Clients() {
   const [filter, setFilter] = useState<Filter>('needs');
   const [query, setQuery] = useState('');
   const [actionsFor, setActionsFor] = useState<DemoClient | null>(null);
+  const [prepFor, setPrepFor] = useState<DemoClient | null>(null);
   const auth = useAuth();
+  // Due follow-ups and body-variance reasons (short sleep, load spike) join the list.
+  useMemoryTriage();
 
   // Assistants see only their assigned clients (K-8). Connected builds get this from RLS as well.
   const visible = useVisibleClientIds();
@@ -206,6 +211,16 @@ export default function Clients() {
         {actionsFor ? (
           <>
             <ListRow
+              title="Prep"
+              subtitle="30 seconds before you talk"
+              left={<Feather name="clipboard" size={20} color={colors.ink2} />}
+              onPress={() => {
+                const c = actionsFor;
+                setActionsFor(null);
+                setPrepFor(c);
+              }}
+            />
+            <ListRow
               title="Reply"
               left={<Feather name="message-square" size={20} color={colors.ink2} />}
               onPress={() => {
@@ -224,6 +239,24 @@ export default function Clients() {
           </>
         ) : null}
       </Sheet>
+
+      <Sheet visible={!!prepFor} title={prepFor ? `Prep: ${prepFor.name}` : ''} onClose={() => setPrepFor(null)}>
+        {prepFor ? (
+          <View style={styles.prep}>
+            <PrepCard clientId={prepFor.id} inset={false} />
+            <ListRow
+              title={`Open ${prepFor.name.split(' ')[0]}`}
+              chevron
+              last
+              onPress={() => {
+                const c = prepFor;
+                setPrepFor(null);
+                router.push(`/client/${c.id}`);
+              }}
+            />
+          </View>
+        ) : null}
+      </Sheet>
     </Screen>
   );
 }
@@ -232,5 +265,6 @@ const styles = StyleSheet.create({
   search: { paddingHorizontal: margin, paddingBottom: space[3] },
   chips: { paddingHorizontal: margin, gap: space[2], paddingBottom: space[3] },
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: space[4], minHeight: 44, justifyContent: 'center' },
+  prep: { paddingHorizontal: margin, gap: space[2] },
   bulk: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingHorizontal: margin, minHeight: 44, alignSelf: 'flex-start' },
 });

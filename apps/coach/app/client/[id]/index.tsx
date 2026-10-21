@@ -6,6 +6,8 @@ import { Button, EmptyState, IconButton, ListRow, Monogram, Screen, SectionLabel
 import { tenant } from '../../../src/env';
 import { initials, useCoach } from '../../../src/store';
 import { ClientSections } from '../../../src/ClientSections';
+import { PrepCard } from '../../../src/memory/PrepCard';
+import { useMemoryTriage } from '../../../src/memory/useClientMemory';
 
 /** K-3 client detail. */
 export default function ClientDetail() {
@@ -14,6 +16,7 @@ export default function ClientDetail() {
   const toast = useToast();
   const { clients, triage, notes, setNote, setPaused, markHandled, restore } = useCoach();
   const c = clients.find((x) => x.id === id);
+  useMemoryTriage();
   const back = <IconButton icon="arrow-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/clients'))} />;
 
   if (!c) {
@@ -73,6 +76,8 @@ export default function ClientDetail() {
           <Text variant="callout">{c.injuryNote}</Text>
         </View>
       ) : null}
+
+      <PrepCard clientId={c.id} />
 
       {open ? (
         <>

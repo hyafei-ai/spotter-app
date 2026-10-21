@@ -5,7 +5,7 @@ import { ListRow, SectionLabel, Tag, Text, useTheme, margin, space } from '@spot
 import { useCoach } from '../store';
 import { AI_LIVE, DEMO_MONTHLY_CAP, useAi } from './store';
 
-/** Client detail (K-3) → assistant: week summary, program draft, and churn risk (coach-only). */
+/** Client detail (K-3) → assistant: week summary, program draft, and the quiet-lately flag (coach-only). */
 export function AiSection({ clientId }: { clientId: string }) {
   const { colors } = useTheme();
   const summary = useAi((s) => s.summaries[clientId]);
@@ -38,7 +38,7 @@ export function AiSection({ clientId }: { clientId: string }) {
       {churn ? (
         <ListRow
           left={<Feather name="alert-triangle" size={20} color={colors.warning} />}
-          title="Churn risk"
+          title="Quiet lately"
           reason={reasonText(churn)}
           subtitle="Flagged by the nightly check. Only you see this."
         />

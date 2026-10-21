@@ -243,6 +243,10 @@ export const TriageReason = z.enum([
   'missed_sessions',
   'churn_risk',
   'new_client',
+  // Coach memory (docs/jtbd.md, coach job): follow-ups and body-variance signals.
+  'follow_up_due',
+  'sleep_short_streak',
+  'load_spike',
 ]);
 export type TriageReason = z.infer<typeof TriageReason>;
 

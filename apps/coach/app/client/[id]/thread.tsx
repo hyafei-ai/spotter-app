@@ -7,6 +7,8 @@ import { MessageBubble, VoiceRecorder, isConfigured, supabase, useAuth, useThrea
 import { tenant } from '../../../src/env';
 import { useCoach } from '../../../src/store';
 import { useInbox, type CoachMessage } from '../../../src/platform/inbox';
+import { FollowUpSheet } from '../../../src/memory/FollowUpSheet';
+import { useMemoryLoaded } from '../../../src/memory/store';
 
 // Stable empty list: a fresh [] from the selector would re-render forever (React #185).
 const NO_MESSAGES: CoachMessage[] = [];
@@ -25,10 +27,11 @@ export default function Thread() {
   const send = useInbox((s) => s.send);
   const replies = useInbox((s) => s.savedReplies);
   const [draft, setDraft] = useState('');
-  const [sheet, setSheet] = useState<'attach' | 'replies' | null>(null);
+  const [sheet, setSheet] = useState<'attach' | 'replies' | 'remind' | null>(null);
   const [recording, setRecording] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const first = c?.name.split(' ')[0] ?? 'client';
+  useMemoryLoaded();
 
   // Connected: find the thread and load its messages (RLS limits it to clients this coach can see).
   useEffect(() => {
@@ -122,6 +125,8 @@ export default function Thread() {
             </Text>
           ) : null}
         </View>
+        <View style={{ flex: 1 }} />
+        <IconButton icon="bell" label={`Remind me to follow up with ${first}`} onPress={() => setSheet('remind')} />
       </View>
       {msgs.length === 0 ? (
         <Text color="ink2" style={{ padding: margin }}>
@@ -151,6 +156,7 @@ export default function Thread() {
         />
       )}
 
+      <FollowUpSheet clientId={id ?? ''} firstName={first} visible={sheet === 'remind'} onClose={() => setSheet(null)} />
       <Sheet visible={sheet === 'attach'} title="Send" onClose={() => setSheet(null)}>
         <ListRow
           title="Voice note"
