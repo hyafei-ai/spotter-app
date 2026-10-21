@@ -24,7 +24,9 @@ import { getAuth, useAuth, useTriageRealtime } from '@spotter/ui/platform';
 import { initials, useCoach } from '../../src/store';
 import { tenant } from '../../src/env';
 import { SwipeRow } from '../../src/platform/SwipeRow';
-import { useVisibleClientIds } from '../../src/platform/team';
+import { useRole, useVisibleClientIds } from '../../src/platform/team';
+import { requestedClientIds, triageForViewer, useDemoCheckInRequests } from '../../src/retention/store';
+import { useCheckInDone } from '../../src/retention/CheckInDone';
 import { loadCoachData, saveTriage } from '../../src/platform/serverData';
 import { PrepCard } from '../../src/memory/PrepCard';
 import { useMemoryTriage } from '../../src/memory/useClientMemory';
@@ -52,9 +54,20 @@ export default function Clients() {
   useMemoryTriage();
 
   // Assistants see only their assigned clients (K-8). Connected builds get this from RLS as well.
-  const visible = useVisibleClientIds();
+  // Check-in requests from the owner are addressed to one coach, who sees that member too (retention).
+  const { viewerId } = useRole();
+  useDemoCheckInRequests();
+  const checkIn = useCheckInDone();
+  const baseVisible = useVisibleClientIds();
+  const visible = useMemo(
+    () => (baseVisible ? new Set([...baseVisible, ...requestedClientIds(allTriage, viewerId)]) : null),
+    [baseVisible, allTriage, viewerId],
+  );
   const clients = useMemo(() => (visible ? allClients.filter((c) => visible.has(c.id)) : allClients), [allClients, visible]);
-  const triage = useMemo(() => (visible ? allTriage.filter((t) => visible.has(t.clientId)) : allTriage), [allTriage, visible]);
+  const triage = useMemo(
+    () => triageForViewer(visible ? allTriage.filter((t) => visible.has(t.clientId)) : allTriage, viewerId),
+    [allTriage, visible, viewerId],
+  );
 
   // Live: triage:<tenant_id>:<coach_id> refreshes the list when anything changes (connected builds).
   const refresh = useCallback(() => void loadCoachData().catch(() => {}), []);
@@ -82,6 +95,17 @@ export default function Clients() {
   }, [rows, clients, filter, q]);
 
   const handled = (c: DemoClient) => {
+    // An open check-in request asks how they checked in first; that also clears the rest.
+    const open = triage.filter((t) => t.clientId === c.id && !t.handledAt);
+    if (
+      checkIn.ask(c.name, open, () => {
+        const items = markHandled(c.id);
+        void saveTriage(items.map((i) => i.id).filter((id) => !id.startsWith('req-')), { handled_at: new Date().toISOString(), handled_by: getAuth().userId });
+      })
+    ) {
+      setActionsFor(null);
+      return;
+    }
     const items = markHandled(c.id);
     setActionsFor(null);
     const ids = items.map((i) => i.id);
@@ -257,6 +281,7 @@ export default function Clients() {
           </View>
         ) : null}
       </Sheet>
+      {checkIn.sheet}
     </Screen>
   );
 }

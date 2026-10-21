@@ -17,7 +17,8 @@ const outputs = [
   { out: fn('nutrition.ts'), body: header('nutrition.ts') + readFileSync(core('nutrition.ts'), 'utf8') },
   // platform.ts (invites, sync pull, push, consent) imports only zod.
   { out: fn('platform.ts'), body: header('platform.ts') + readFileSync(core('platform.ts'), 'utf8') },
-  ...['schemas.ts', 'progression.ts', 'ai.ts'].map((f) => ({
+  // signals, grow and retention back the nightly retention-nightly snapshot.
+  ...['schemas.ts', 'progression.ts', 'ai.ts', 'signals.ts', 'grow.ts', 'retention.ts'].map((f) => ({
     out: fn(`core/${f}`),
     body: header(f) + withExt(readFileSync(core(f), 'utf8')),
   })),

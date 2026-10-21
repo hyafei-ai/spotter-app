@@ -13,6 +13,7 @@ export const TRIAGE_PRIORITY: Record<TriageReason, number> = {
   follow_up_due: 65,
   sleep_short_streak: 45,
   load_spike: 42,
+  check_in_request: 75,
 };
 
 export interface TriageItem {
@@ -21,11 +22,15 @@ export interface TriageItem {
   reason: TriageReason;
   /** Count for "Missed 2 sessions", or similar. */
   count?: number;
-  /** Words for reasons that carry their own text, e.g. a follow-up ("Ask about knee"). */
+  /** Words for reasons that carry their own text: a follow-up ("Ask about knee") or an owner's
+   *  check-in request ("Maya asked you to check in: no session in 12 days"). */
   detail?: string;
   since: string;
   snoozedUntil: string | null;
   handledAt: string | null;
+  /** Check-in requests: the coach it's addressed to, and the intervention to complete. */
+  coachId?: string | null;
+  interventionId?: string;
 }
 
 const DAY = 86_400_000;
@@ -61,6 +66,8 @@ export function reasonText(item: TriageItem, now: number = Date.now()): string {
       return item.detail ?? `Short sleep ${item.count ?? 3} nights`;
     case 'load_spike':
       return item.detail ?? 'Training load jumped this week';
+    case 'check_in_request':
+      return item.detail ?? 'Asked you to check in';
   }
 }
 

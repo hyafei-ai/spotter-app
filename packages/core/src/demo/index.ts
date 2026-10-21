@@ -6,3 +6,4 @@ export * from './foods';
 export * from './nutrition';
 export * from './grow';
 export * from './daily';
+export * from './retention';
