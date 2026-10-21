@@ -216,6 +216,39 @@ export const Mutation = z.discriminatedUnion('kind', [
       recordedAt: isoDateTime,
     }),
   }),
+  // Daily read (client JTBD): the 30-second check, and which version of a session the client chose.
+  z.object({
+    ...base,
+    kind: z.literal('daily_check.submit'),
+    payload: z.object({
+      checkId: uuid,
+      date: isoDate,
+      sleepHours: z.number().min(0).max(16).nullable(),
+      sleepSource: z.enum(['health', 'manual']).nullable(),
+      energy: z.number().int().min(1).max(5).nullable(),
+      soreness: z.number().int().min(1).max(5).nullable(),
+      stress: z.number().int().min(1).max(5).nullable(),
+      cyclePhase: z.enum(['menstrual', 'follicular', 'ovulation', 'luteal']).nullable(),
+      shareCycle: z.boolean(),
+      note: z.string().max(300).nullable(),
+      shareWithCoach: z.boolean(),
+      /** The read as the coach may see it (cycle phase removed unless shared); null when private. */
+      sharedRead: z
+        .object({
+          tone: z.enum(['steady', 'watch', 'ease']),
+          headline: z.string().max(300),
+          factors: z.array(z.object({ kind: z.string().max(40), text: z.string().max(400), strain: z.boolean() })).max(20),
+          suggestLighter: z.boolean(),
+        })
+        .nullable(),
+      submittedAt: isoDateTime,
+    }),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal('session.variant'),
+    payload: z.object({ sessionId: uuid, variant: z.enum(['planned', 'lighter', 'recovery']) }),
+  }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];

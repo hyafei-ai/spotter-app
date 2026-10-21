@@ -8,6 +8,7 @@ import { longDate, prescriptionLine } from '../../src/format';
 import { isFinishedToday, suggestionFor, todayPlan, useApp } from '../../src/store';
 import { DueItems } from '../../src/DueItems';
 import { lookupDay, useAssigned } from '../../src/programs';
+import { TodayRead } from '../../src/daily/TodayRead';
 
 /** C-3 Today. Header is the session name, never a greeting. One primary action. */
 export default function Today() {
@@ -99,6 +100,7 @@ export default function Today() {
           </Text>
           <Text color="ink2">{longDate(isoDay(0))}</Text>
         </View>
+        <TodayRead />
         <CoachNote name={first ?? ''} text={tenant.coach.restDayLine} />
         <SectionLabel>Optional</SectionLabel>
         {/* MOCK DATA: rest-day tasks come from the coach's program. */}
@@ -124,6 +126,7 @@ export default function Today() {
             {done.sets.length} sets logged. {first} will see them once they sync.
           </Text>
         </View>
+        <TodayRead />
         <DueItems />
       </Screen>
     );
@@ -142,6 +145,7 @@ export default function Today() {
         </Text>
         <Text color="ink2">{longDate(plan.scheduledDate)}</Text>
       </View>
+      <TodayRead plan={plan} />
       {plan.coachNote ? <CoachNote name={first ?? ''} text={plan.coachNote} /> : null}
       <SectionLabel>{`${plan.exercises.length} exercises`}</SectionLabel>
       {plan.exercises.map((e, i) => {

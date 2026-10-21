@@ -11,7 +11,7 @@ import type { HealthToday } from './types';
 
 type Status = 'not_connected' | 'connected' | 'denied';
 
-const useHealthStatus = create<{ status: Status; set: (s: Status) => void }>()(
+export const useHealthStatus = create<{ status: Status; set: (s: Status) => void }>()(
   persist((set) => ({ status: 'not_connected', set: (status) => set({ status }) }), {
     name: 'spotter.health',
     storage: createJSONStorage(() => kv),

@@ -2,7 +2,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import { formatDuration, volumeKg } from '@spotter/core';
-import { EmptyState, ListRow, Screen, ScreenHeader, Text, margin, space } from '@spotter/ui';
+import { EmptyState, ListRow, Screen, ScreenHeader, Tag, Text, margin, space } from '@spotter/ui';
 import { shortDate, w } from '../../src/format';
 import { useApp } from '../../src/store';
 
@@ -24,6 +24,7 @@ export default function History() {
             <ListRow
               title={`${item.title} · ${shortDate(item.date)}`}
               subtitle={`${item.sets.length} sets · ${formatDuration((Date.parse(item.finishedAt) - Date.parse(item.startedAt)) / 1000)} · ${w(volumeKg(item.sets))}`}
+              right={item.variant === 'lighter' ? <Tag label="Easier version" /> : item.variant === 'recovery' ? <Tag label="Recovery" /> : undefined}
               chevron
               last={index === rows.length - 1}
               onPress={() => router.push(`/history/${item.sessionId}`)}
