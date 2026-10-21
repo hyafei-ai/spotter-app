@@ -18,6 +18,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./demo": "./src/demo/index.ts",
-    "./demo-tenants.json": "./src/demo-tenants.json"
+    "./demo-tenants.json": "./src/demo-tenants.json",
+    "./shared-tenant.json": "./src/shared-tenant.json"
   }
 }

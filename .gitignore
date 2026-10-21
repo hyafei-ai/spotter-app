@@ -14,3 +14,4 @@ coverage/
 next-env.d.ts.bak
 *.tsbuildinfo
 .claude/worktrees/
+.secrets/

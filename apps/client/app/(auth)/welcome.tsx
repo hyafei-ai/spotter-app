@@ -3,13 +3,19 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Monogram, Text, useTheme, margin, space, Screen } from '@spotter/ui';
 import { DEMO_CLIENT } from '@spotter/core/demo';
 import { tenant } from '../../src/env';
+import { TrainerCode } from '../../src/TrainerCode';
+import { useRuntimeTenant } from '../../src/runtimeTenant';
 
 /** C-1/C-2 welcome. The invite link pre-fills tenant and email; `?invite=expired` shows the invalid-invite state. */
 export default function Welcome() {
   const { colors } = useTheme();
-  const { invite } = useLocalSearchParams<{ invite?: string }>();
+  const { invite, code } = useLocalSearchParams<{ invite?: string; code?: string }>();
+  const needsCode = useRuntimeTenant((s) => s.needsCode);
   const coach = tenant.coach;
   const firstName = coach.name.split(' ')[0];
+
+  // Shared Spotter app: pick the trainer first (W-3).
+  if (needsCode) return <TrainerCode initialCode={code} />;
 
   if (invite === 'expired' || invite === 'invalid') {
     return (

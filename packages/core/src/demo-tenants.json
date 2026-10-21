@@ -27,7 +27,8 @@
       "android": "com.spotter.mayareyes"
     },
     "scheme": "mayareyes",
-    "updateChannel": "maya-reyes-strength"
+    "updateChannel": "maya-reyes-strength",
+    "joinCode": "MAYA"
   },
   "north-shore-barbell": {
     "id": "0192f0a0-0000-7000-8000-000000000002",
@@ -57,6 +58,13 @@
       "android": "com.spotter.northshorebarbell"
     },
     "scheme": "northshorebarbell",
-    "updateChannel": "north-shore-barbell"
+    "updateChannel": "north-shore-barbell",
+    "joinCode": "NSB2026",
+    "tabs": {
+      "today": "Train",
+      "history": "Log",
+      "coach": "Coach",
+      "me": "Profile"
+    }
   }
 }

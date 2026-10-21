@@ -15,3 +15,4 @@ export * from './checkins';
 export * from './ai';
 export * from './nutrition';
 export * from './grow';
+export * from './branding';

@@ -257,3 +257,36 @@ export type CheckoutRequest = z.infer<typeof CheckoutRequest>;
 /** POST /stripe/connect/onboard and /stripe/portal: return URLs only; identity comes from the JWT. */
 export const ReturnUrlsRequest = z.object({ returnUrl: z.string().url(), refreshUrl: z.string().url().optional() });
 export type ReturnUrlsRequest = z.infer<typeof ReturnUrlsRequest>;
+/* ---------- Publishing (W-2/W-3): Edge Function inputs ---------- */
+
+export const TenantsPublishRequest = z.object({
+  platforms: z.array(z.enum(['ios', 'android'])).min(1).max(2),
+  kind: z.enum(['build', 'update', 'submit']),
+});
+export type TenantsPublishRequest = z.infer<typeof TenantsPublishRequest>;
+
+/** Store credentials are only ever sent to the store-credentials function, never stored in plaintext. */
+export const StoreCredentialUpload = z.discriminatedUnion('platform', [
+  z.object({
+    platform: z.literal('ios'),
+    keyId: z.string().regex(/^[A-Z0-9]{8,12}$/),
+    // Apple issuer IDs are UUID-shaped but don't follow RFC 4122 variants, so match the shape only.
+    issuerId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+    privateKeyP8: z.string().includes('BEGIN PRIVATE KEY').max(4000),
+  }),
+  z.object({
+    platform: z.literal('android'),
+    serviceAccountJson: z
+      .string()
+      .max(20000)
+      .refine((s) => {
+        try {
+          const j = JSON.parse(s) as { type?: string; client_email?: string; private_key?: string };
+          return j.type === 'service_account' && !!j.client_email && !!j.private_key;
+        } catch {
+          return false;
+        }
+      }, 'Upload the service-account JSON file from Google Cloud.'),
+  }),
+]);
+export type StoreCredentialUpload = z.infer<typeof StoreCredentialUpload>;

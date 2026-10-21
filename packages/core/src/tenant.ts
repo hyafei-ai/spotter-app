@@ -10,6 +10,24 @@ export const TenantModules = z.object({
   storefront: z.boolean(),
 });
 
+/** Tab labels a trainer may pick from (W-1 deep branding). '{coach}' renders the coach's first name. */
+export const TAB_LABEL_OPTIONS = {
+  today: ['Today', 'Train', 'Plan'],
+  history: ['History', 'Log', 'Progress'],
+  coach: ['{coach}', 'Coach', 'Messages', 'Chat'],
+  me: ['Me', 'Profile', 'Account'],
+} as const;
+export type TabKey = keyof typeof TAB_LABEL_OPTIONS;
+
+export const TenantTabs = z.object({
+  today: z.enum(TAB_LABEL_OPTIONS.today),
+  history: z.enum(TAB_LABEL_OPTIONS.history),
+  coach: z.enum(TAB_LABEL_OPTIONS.coach),
+  me: z.enum(TAB_LABEL_OPTIONS.me),
+});
+export type TenantTabs = z.infer<typeof TenantTabs>;
+export const DEFAULT_TABS: TenantTabs = { today: 'Today', history: 'History', coach: '{coach}', me: 'Me' };
+
 export const TenantConfig = z.object({
   id: z.string(),
   slug: z.string().regex(/^[a-z0-9-]{3,40}$/),
@@ -31,6 +49,14 @@ export const TenantConfig = z.object({
   bundleIds: z.object({ ios: z.string(), android: z.string() }),
   scheme: z.string(),
   updateChannel: z.string(),
+  /* Optional branding and build fields (W-1/W-2). Missing values fall back to defaults. */
+  tabs: TenantTabs.optional(),
+  /** Code a client types into the shared Spotter app to load this trainer's branding (W-3 fallback). */
+  joinCode: z.string().regex(/^[A-Z0-9]{4,12}$/).optional(),
+  splashBackground: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  logoUrl: z.string().url().optional(),
+  iconUrl: z.string().url().optional(),
+  easProjectId: z.string().optional(),
 });
 export type TenantConfig = z.infer<typeof TenantConfig>;
 

@@ -1,0 +1,21 @@
+{
+  "id": "00000000-0000-7000-8000-000000000000",
+  "slug": "spotter",
+  "appName": "Spotter",
+  "shortName": "Spotter",
+  "brandColor": "#C2410C",
+  "units": "kg",
+  "weightIncrement": 2.5,
+  "coach": {
+    "name": "Your coach",
+    "monogram": "S",
+    "welcomeMessage": "Enter the code your trainer gave you to see their program.",
+    "restDayLine": "Rest day."
+  },
+  "supportEmail": "help@spotter.example",
+  "privacyPolicyUrl": "https://spotter.example/privacy",
+  "modules": { "nutrition": true, "checkIns": true, "formChecks": true, "habits": true, "storefront": false },
+  "bundleIds": { "ios": "app.spotter.client", "android": "app.spotter.client" },
+  "scheme": "spotter",
+  "updateChannel": "spotter-shared"
+}

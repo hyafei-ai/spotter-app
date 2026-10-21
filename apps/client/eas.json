@@ -1,0 +1,39 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "base": {
+      "node": "22.20.0",
+      "pnpm": "10.28.0",
+      "env": { "EXPO_NO_TELEMETRY": "1" }
+    },
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "extends": "base",
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
+    },
+    "production": {
+      "extends": "base",
+      "distribution": "store",
+      "ios": { "resourceClass": "m-medium" },
+      "android": { "buildType": "app-bundle" }
+    },
+    "shared": {
+      "extends": "production",
+      "env": { "TENANT_ID": "spotter" }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {},
+      "android": { "track": "internal", "releaseStatus": "draft", "serviceAccountKeyPath": "./.secrets/play-service-account.json" }
+    }
+  }
+}
