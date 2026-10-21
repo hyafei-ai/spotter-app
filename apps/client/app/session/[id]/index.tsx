@@ -230,6 +230,16 @@ export default function Logger() {
                     </Text>
                   ) : null}
                 </View>
+                <IconButton
+                  icon="video"
+                  label={`Send a form check of ${swap?.name ?? e.name}`}
+                  onPress={() => {
+                    // Attach to the set in progress, else the last one logged for this exercise.
+                    const done = session.sets.filter((x) => x.programExerciseId === e.id).map((x) => x.setIndex);
+                    const setIdx = current?.exercise.id === e.id ? current.setIndex : done.length ? Math.max(...done) : '';
+                    router.push(`/form-check/new?pe=${e.id}&set=${setIdx}`);
+                  }}
+                />
                 {e.alternatives.length ? <IconButton icon="repeat" label={`Swap ${e.name} for an approved alternative`} onPress={() => setSwapFor(e)} /> : null}
               </View>
 

@@ -1,4 +1,5 @@
 import { ProgramSection } from './ProgramSection';
+import { CheckInsSection, FormChecksSection } from './media/sections';
 
 /**
  * Feature sections on the coach's client detail (K-3): program, check-ins, form checks, nutrition,
@@ -7,6 +8,8 @@ import { ProgramSection } from './ProgramSection';
 const SECTIONS: React.ComponentType<{ clientId: string }>[] = [
   // feature sections
   ProgramSection,
+  FormChecksSection,
+  CheckInsSection,
 ];
 
 export function ClientSections({ clientId }: { clientId: string }) {

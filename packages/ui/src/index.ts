@@ -14,3 +14,8 @@ export * from './components/Sheet';
 export * from './components/Screen';
 export * from './AppProviders';
 export * from './components/IntakeFields';
+export * from './components/VideoPlayer';
+export * from './components/VoiceOver';
+export * from './sampleClip';
+export * from './mediaStore';
+export * from './sharedDemo';
