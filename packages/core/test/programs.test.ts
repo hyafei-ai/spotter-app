@@ -275,3 +275,26 @@ describe('library', () => {
     expect(m[0]!.score).toBe(1);
   });
 });
+
+describe('programFromAiDraft', () => {
+  it('builds an unpublished ai_draft program with days spread across the week and loads left empty', async () => {
+    const { programFromAiDraft, programProblems } = await import('../src/programs');
+    const { LOWER_A } = await import('../src/demo/client');
+    const ex = LOWER_A.exercises.map((e) => ({ ...e, sets: e.sets.map((s) => ({ ...s, loadKg: null })) }));
+    let n = 0;
+    const p = programFromAiDraft(
+      { name: 'Strength block', weeks: [{ days: [{ title: 'Lower', coachNote: null, exercises: ex }, { title: 'Upper', coachNote: 'Easy', exercises: ex }, { title: 'Full', coachNote: null, exercises: ex }] }] },
+      '2026-10-21T00:00:00.000Z',
+      () => `id-${n++}`,
+    );
+    expect(p.status).toBe('draft');
+    expect(p.source).toBe('ai_draft');
+    expect(p.weeks[0]!.days.map((d) => d.weekday)).toEqual([1, 3, 5]);
+    const squat = p.weeks[0]!.days[0]!.exercises[0]!;
+    // Squat has an RPE target and no load: it's loaded by RPE. The RDL has neither: absolute, left for the coach.
+    expect(squat.sets[0]).toMatchObject({ loadType: 'rpe', loadValue: null, rpe: 8, repsMin: 5, repsMax: 8 });
+    expect(p.weeks[0]!.days[0]!.exercises[1]!.sets[0]).toMatchObject({ loadType: 'absolute', loadValue: null });
+    expect(new Set([p.id, ...p.weeks.flatMap((w) => w.days.map((d) => d.id))]).size).toBe(4);
+    expect(Array.isArray(programProblems(p))).toBe(true);
+  });
+});

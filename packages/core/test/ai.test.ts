@@ -16,7 +16,7 @@ import {
   toDraftProgram,
   usageState,
   type CheckInSummarySource,
-  type LibraryExercise,
+  type DraftLibraryExercise,
 } from '../src/ai';
 import { DEMO_HISTORY, LOWER_A } from '../src/demo/client';
 import { uuidv7 } from '../src/ids';
@@ -100,7 +100,7 @@ describe('check-in summary input', () => {
   });
 });
 
-const library: LibraryExercise[] = LOWER_A.exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name, metric: e.metric, equipment: [] }));
+const library: DraftLibraryExercise[] = LOWER_A.exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name, metric: e.metric, equipment: [] }));
 
 describe('program draft', () => {
   const src = {

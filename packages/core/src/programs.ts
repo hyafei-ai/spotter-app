@@ -521,3 +521,72 @@ export function setOverride(a: Assignment, date: string, day: ProgramDay | null)
   else delete overrides[date];
   return { ...a, overrides };
 }
+
+/* ---------- AI drafts (K-2) ---------- */
+
+/** Training days spread across the week so rest days fall between sessions. */
+export const SPREAD_WEEKDAYS: Record<number, number[]> = {
+  1: [1],
+  2: [1, 4],
+  3: [1, 3, 5],
+  4: [1, 2, 4, 5],
+  5: [1, 2, 3, 4, 5],
+  6: [1, 2, 3, 4, 5, 6],
+  7: [1, 2, 3, 4, 5, 6, 7],
+};
+
+interface AiDraftShape {
+  name: string;
+  weeks: { days: { title: string; coachNote: string | null; exercises: SessionPlan['exercises'] }[] }[];
+}
+
+/**
+ * Turns an AI program draft (weeks → days → session-plan exercises) into an unpublished program the
+ * coach edits in the builder. Loads the model left empty stay empty for the coach to set.
+ */
+export function programFromAiDraft(draft: AiDraftShape, now = new Date().toISOString(), newId: () => string = uuidv7): Program {
+  return {
+    id: newId(),
+    name: draft.name,
+    status: 'draft',
+    isTemplate: false,
+    version: 1,
+    source: 'ai_draft',
+    updatedAt: now,
+    weeks: draft.weeks.map((w) => {
+      const weekdays = SPREAD_WEEKDAYS[Math.min(7, Math.max(1, w.days.length))] ?? [1];
+      return {
+        id: newId(),
+        days: w.days.slice(0, 7).map((d, i) => ({
+          id: newId(),
+          title: d.title,
+          weekday: weekdays[i] ?? i + 1,
+          coachNote: d.coachNote,
+          exercises: d.exercises.map((e) => ({
+            id: newId(),
+            exerciseId: e.exerciseId,
+            name: e.name,
+            metric: e.metric,
+            supersetGroup: e.supersetGroup,
+            restS: Math.min(900, e.restS),
+            tempo: e.tempo,
+            note: e.note,
+            trackRpe: e.trackRpe,
+            alternatives: e.alternatives,
+            progressionRule: e.progressionRule,
+            sets: e.sets.map((s) => ({
+              repsMin: s.repsMin,
+              repsMax: s.repsMax,
+              loadType: e.metric === 'weight_reps' ? (s.loadKg == null && s.rpe != null ? 'rpe' : 'absolute') : 'bodyweight',
+              loadValue: e.metric === 'weight_reps' ? s.loadKg : null,
+              rpe: s.rpe,
+              durationS: s.durationS,
+              distanceM: s.distanceM,
+              amrap: s.amrap,
+            })),
+          })),
+        })),
+      };
+    }),
+  };
+}

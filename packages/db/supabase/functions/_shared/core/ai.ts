@@ -211,11 +211,17 @@ export function mockCheckInSummary(input: CheckInSummaryInput): CheckInSummaryOu
 
 /* ---------- program draft ---------- */
 
-export interface LibraryExercise {
+/** The minimum the model sees of an exercise in the coach's library. */
+export interface DraftLibraryExercise {
   exerciseId: string;
   name: string;
   metric: ExerciseMetric;
   equipment: string[];
+}
+
+/** From the coach's full library entries (packages/core/src/library.ts) to the model's minimal view. */
+export function toDraftLibrary(lib: { id: string; name: string; metric: ExerciseMetric; equipment: string[] }[]): DraftLibraryExercise[] {
+  return lib.map((e) => ({ exerciseId: e.id, name: e.name, metric: e.metric, equipment: e.equipment }));
 }
 
 export interface ProgramDraftSource {
@@ -229,7 +235,7 @@ export interface ProgramDraftSource {
     [key: string]: unknown;
   };
   weeks: number;
-  library: LibraryExercise[];
+  library: DraftLibraryExercise[];
   templates: { name: string; dayTitles: string[] }[];
 }
 
@@ -368,7 +374,7 @@ export class DraftValidationError extends Error {}
  * Turns validated model output into the program shape. Throws DraftValidationError when the model
  * used an exercise outside the library or a reps range that makes no sense, so the caller can retry once.
  */
-export function toDraftProgram(out: ProgramDraftOutput, library: LibraryExercise[], newId: () => string): DraftProgram {
+export function toDraftProgram(out: ProgramDraftOutput, library: DraftLibraryExercise[], newId: () => string): DraftProgram {
   const lib = new Map(library.map((e) => [e.exerciseId, e]));
   return {
     id: newId(),

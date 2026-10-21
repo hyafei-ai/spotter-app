@@ -9,7 +9,7 @@ import {
   programDraftPrompt,
   toDraftProgram,
   type DraftProgram,
-  type LibraryExercise,
+  type DraftLibraryExercise,
 } from '../_shared/core/ai.ts';
 import { MODEL, aiErrorResponse, callStructured, checkCap, cors, json, userClient } from '../_shared/ai-runtime.ts';
 
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
 
     const { data: lib, error: libErr } = await db.from('exercises').select('id, name, default_metric, equipment');
     if (libErr) throw libErr;
-    const library: LibraryExercise[] = (lib ?? []).map((e) => ({
+    const library: DraftLibraryExercise[] = (lib ?? []).map((e) => ({
       exerciseId: e.id,
       name: e.name,
       metric: e.default_metric,

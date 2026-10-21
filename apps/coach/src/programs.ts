@@ -94,6 +94,8 @@ interface ProgramsState {
   /** Saves a draft: publishes programs (edits reach assignments from the next unstarted session) or stores the override. */
   save(key: string, opts?: { publish?: boolean }): { ok: true } | { ok: false; problems: string[] };
   createProgram(name?: string): string;
+  /** Adds a ready-made program (e.g. an AI draft) as an unpublished draft. */
+  importProgram(p: Program): string;
   duplicate(programId: string): string;
   remove(programId: string): boolean;
   assignTo(programId: string, clientIds: string[], startDate: string): void;
@@ -194,6 +196,12 @@ export const usePrograms = create<ProgramsState>((set, get) => {
     createProgram(name = 'New program') {
       const p = newProgram(name);
       set({ programs: [p, ...get().programs] });
+      persist(get());
+      return p.id;
+    },
+
+    importProgram(p) {
+      set({ programs: [p, ...get().programs.filter((x) => x.id !== p.id)] });
       persist(get());
       return p.id;
     },

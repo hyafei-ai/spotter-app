@@ -5,13 +5,15 @@ import {
   capMessage,
   mockCheckInSummary,
   mockProgramDraft,
+  programFromAiDraft,
   toDraftProgram,
   usageState,
   uuidv7,
   type CheckInSummaryInput,
   type DraftProgram,
 } from '@spotter/core';
-import { DEMO_LIBRARY, demoProgramSource, demoSummarySource } from './demoSource';
+import { demoLibrary, demoProgramSource, demoSummarySource } from './demoSource';
+import { usePrograms } from '../programs';
 
 /**
  * Coach-side AI drafts (K-2). Every output is a draft until the coach taps Approve and send.
@@ -56,7 +58,7 @@ export type ProgramState =
   | { status: 'failed'; message: string }
   | { status: 'cap'; message: string }
   | { status: 'no_intake' }
-  | { status: 'ready'; program: DraftProgram; saved: boolean };
+  | { status: 'ready'; program: DraftProgram; saved: boolean; programId?: string };
 
 export interface SentMessage {
   id: string;
@@ -112,7 +114,6 @@ async function callFunction<T>(name: string, body: unknown): Promise<T> {
 }
 
 /** MOCK: where the demo keeps saved program drafts for the program builder to open. */
-export const PROGRAM_DRAFTS_KEY = 'spotter.programDrafts';
 
 export const useAi = create<AiState>((set, get) => {
   const setSummary = (clientId: string, s: SummaryState) => set({ summaries: { ...get().summaries, [clientId]: s } });
@@ -206,7 +207,8 @@ export const useAi = create<AiState>((set, get) => {
       try {
         if (AI_LIVE) {
           const res = await callFunction<{ program: DraftProgram }>('ai-program-draft', { clientId, weeks });
-          return setProgram(clientId, { status: 'ready', program: res.program, saved: true });
+          const programId = usePrograms.getState().importProgram(programFromAiDraft(res.program));
+          return setProgram(clientId, { status: 'ready', program: res.program, saved: true, programId });
         }
         // MOCK path
         await delay(900);
@@ -217,7 +219,7 @@ export const useAi = create<AiState>((set, get) => {
         if (!src) return setProgram(clientId, { status: 'no_intake' });
         const out = mockProgramDraft(buildProgramDraftInput(src));
         set({ used: get().used + 1 });
-        setProgram(clientId, { status: 'ready', program: toDraftProgram(out, DEMO_LIBRARY, () => uuidv7()), saved: false });
+        setProgram(clientId, { status: 'ready', program: toDraftProgram(out, demoLibrary(), () => uuidv7()), saved: false });
       } catch (err) {
         const e = err as Error & { code?: string };
         if (e.code === 'cap_reached') return setProgram(clientId, { status: 'cap', message: e.message });
@@ -229,14 +231,9 @@ export const useAi = create<AiState>((set, get) => {
     saveProgramDraft(clientId) {
       const p = get().programs[clientId];
       if (p?.status !== 'ready') return;
-      try {
-        const ls = typeof localStorage === 'undefined' ? null : localStorage;
-        const all = JSON.parse(ls?.getItem(PROGRAM_DRAFTS_KEY) ?? '[]') as (DraftProgram & { clientId: string })[];
-        ls?.setItem(PROGRAM_DRAFTS_KEY, JSON.stringify([...all.filter((d) => d.id !== p.program.id), { ...p.program, clientId }]));
-      } catch {
-        // Demo storage is best effort; the draft stays in memory either way.
-      }
-      setProgram(clientId, { ...p, saved: true });
+      // Lands in the program builder as an unpublished draft (source 'ai_draft'); MOCK storage in the demo.
+      const programId = usePrograms.getState().importProgram(programFromAiDraft(p.program));
+      setProgram(clientId, { ...p, saved: true, programId });
     },
   };
 });

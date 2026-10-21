@@ -3,7 +3,8 @@
  * Only Jordan Ellis has logged sets in the sample data, so only Jordan has a week to summarise.
  * Intake answers are invented sample answers in the default intake form's shape.
  */
-import { detectRecords, type CheckInSummarySource, type LibraryExercise, type ProgramDraftSource } from '@spotter/core';
+import { detectRecords, toDraftLibrary, type CheckInSummarySource, type DraftLibraryExercise, type ProgramDraftSource } from '@spotter/core';
+import { usePrograms } from '../programs';
 import { DEMO_CLIENTS, DEMO_HISTORY, LOWER_A, isoDay } from '@spotter/core/demo';
 
 const DAY = 86_400_000;
@@ -59,17 +60,8 @@ export function demoIntake(clientId: string) {
   return INTAKE[clientId] ?? null;
 }
 
-/** MOCK: a starter exercise library standing in for the coach's own library. */
-export const DEMO_LIBRARY: LibraryExercise[] = [
-  ...LOWER_A.exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name, metric: e.metric, equipment: ['barbell'] })),
-  { exerciseId: 'bench-press', name: 'Bench Press', metric: 'weight_reps', equipment: ['barbell', 'bench'] },
-  { exerciseId: 'barbell-row', name: 'Barbell Row', metric: 'weight_reps', equipment: ['barbell'] },
-  { exerciseId: 'overhead-press', name: 'Overhead Press', metric: 'weight_reps', equipment: ['barbell'] },
-  { exerciseId: 'pull-up', name: 'Pull-up', metric: 'bodyweight_reps', equipment: ['bar'] },
-  { exerciseId: 'hip-thrust', name: 'Hip Thrust', metric: 'weight_reps', equipment: ['barbell', 'bench'] },
-  { exerciseId: 'db-row', name: 'Dumbbell Row', metric: 'weight_reps', equipment: ['dumbbells'] },
-  { exerciseId: 'plank', name: 'Plank', metric: 'time', equipment: [] },
-];
+/** The coach's real library (starter set plus their own exercises), as the model sees it. */
+export const demoLibrary = (): DraftLibraryExercise[] => toDraftLibrary(usePrograms.getState().library());
 
 export function demoProgramSource(clientId: string, weeks: number): ProgramDraftSource | null {
   const client = DEMO_CLIENTS.find((c) => c.id === clientId);
@@ -79,7 +71,7 @@ export function demoProgramSource(clientId: string, weeks: number): ProgramDraft
     client: { id: client.id, fullName: client.name },
     intake: { goal: intake.goal, daysPerWeek: Number(intake.days), equipment: intake.equipment, injuries: intake.injuries, parq: {} },
     weeks,
-    library: DEMO_LIBRARY,
+    library: demoLibrary(),
     templates: [],
   };
 }

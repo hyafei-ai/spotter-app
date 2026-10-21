@@ -58,7 +58,12 @@ export default function AiProgram() {
   const footer =
     state.status === 'ready' ? (
       state.saved ? (
-        <Button label="Back to client" kind="secondary" onPress={back} />
+        <>
+          {state.programId ? (
+            <Button label="Open in program builder" onPress={() => router.push(`/program/${state.programId}`)} />
+          ) : null}
+          <Button label="Back to client" kind="quiet" onPress={back} />
+        </>
       ) : (
         <>
           <Button
