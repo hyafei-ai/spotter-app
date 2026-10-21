@@ -34,8 +34,6 @@ export default function Me() {
       <ListRow title={DEMO_CLIENT.name} subtitle={DEMO_CLIENT.email} />
       <ListRow title="Units" subtitle={tenant.units === 'kg' ? 'Kilograms (set by your coach)' : 'Pounds (set by your coach)'} />
       <ListRow title="Notifications" subtitle="Coach replies, rest timer, check-in reminders" chevron onPress={() => void Linking.openSettings()} />
-      {/* MOCK: plan status comes from subscriptions; the Stripe billing portal link arrives with payments (phase 7). */}
-      <ListRow title="Plan" subtitle="Online coaching · monthly · billing is managed on the web" />
       <ListRow
         title="Signed waiver"
         subtitle={waiver ? `Signed by ${waiver.signedName}, ${new Date(waiver.signedAt).toLocaleDateString()}` : 'Not signed yet'}

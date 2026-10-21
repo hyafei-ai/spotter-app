@@ -158,3 +158,24 @@ export const TriageReason = z.enum([
   'new_client',
 ]);
 export type TriageReason = z.infer<typeof TriageReason>;
+
+/* ---------- Payments (Edge Function inputs) ---------- */
+
+/** POST /stripe/checkout: buy a plan or a storefront program from the trainer's page. */
+export const CheckoutRequest = z
+  .object({
+    tenantSlug: z.string().regex(/^[a-z0-9-]{3,40}$/),
+    planId: z.string().uuid().optional(),
+    productId: z.string().uuid().optional(),
+    couponCode: z.string().regex(/^[A-Za-z0-9-]{3,24}$/).optional(),
+    referralCode: z.string().max(40).optional(),
+    email: z.string().email().optional(),
+    successUrl: z.string().url(),
+    cancelUrl: z.string().url(),
+  })
+  .refine((r) => !!r.planId !== !!r.productId, { message: 'Choose one plan or one program.' });
+export type CheckoutRequest = z.infer<typeof CheckoutRequest>;
+
+/** POST /stripe/connect/onboard and /stripe/portal: return URLs only; identity comes from the JWT. */
+export const ReturnUrlsRequest = z.object({ returnUrl: z.string().url(), refreshUrl: z.string().url().optional() });
+export type ReturnUrlsRequest = z.infer<typeof ReturnUrlsRequest>;
