@@ -158,7 +158,10 @@ export const Mutation = z.discriminatedUnion('kind', [
   // AI (churn signal): the client opened the app. Sent at most every few hours.
   z.object({ ...base, kind: z.literal('app.open'), payload: z.object({ openedAt: isoDateTime }) }),
   // Nutrition (C-8). Kept inline so this file stays self-contained for the Edge Functions copy.
+  z.object({
+    ...base,
     kind: z.literal('food.log'),
+    payload: z.object({
       logId: uuid,
       date: isoDate,
       meal: z.enum(['breakfast', 'lunch', 'dinner', 'snack']),
@@ -173,9 +176,14 @@ export const Mutation = z.discriminatedUnion('kind', [
         .object({ protein: z.number().min(0), carbs: z.number().min(0), fat: z.number().min(0), veg: z.number().min(0) })
         .nullable(),
       loggedAt: isoDateTime,
+    }),
+  }),
   z.object({ ...base, kind: z.literal('food.delete'), payload: z.object({ logId: uuid, deletedAt: isoDateTime }) }),
+  z.object({
+    ...base,
     kind: z.literal('habit.check'),
     payload: z.object({ habitId: z.string().min(1).max(80), date: isoDate, done: z.boolean(), checkedAt: isoDateTime }),
+  }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];
