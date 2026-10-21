@@ -84,7 +84,7 @@ export default function Logger() {
       return { weightKg: existing.weightKg, reps: existing.reps, rpe: existing.rpe, durationS: existing.durationS, distanceM: existing.distanceM };
     }
     const e = current.exercise;
-    const prev = previousSet(completed, e.id, current.setIndex);
+    const prev = previousSet(completed, e.exerciseId, current.setIndex);
     // After the first set, carry over what the client actually used on the previous set today.
     const earlier = [...logged.values()]
       .filter((s) => s.programExerciseId === e.id && s.setIndex < current.setIndex)
@@ -271,7 +271,7 @@ export default function Logger() {
                 const key = setKey(e.id, p.index);
                 const done = logged.get(key);
                 const isCurrent = current?.key === key;
-                const prev = previousSet(completed, e.id, p.index);
+                const prev = previousSet(completed, e.exerciseId, p.index);
                 return (
                   <SetRow
                     key={key}
