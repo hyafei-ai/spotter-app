@@ -11,6 +11,7 @@ import {
   type SessionPlan,
 } from '@spotter/core';
 import { DEMO_HISTORY, LOWER_A, isoDay, type PastSession } from '@spotter/core/demo';
+import { lookupDay, planFor } from './programs';
 import { kv, clearLocalData } from './storage';
 import { syncQueue } from './sync';
 import { APP_VERSION } from './env';
@@ -28,7 +29,8 @@ export interface ActiveSession {
   keptLoad: Record<string, boolean>;
 }
 
-export type CompletedSession = PastSession & { note: string | null };
+/** `plan` is what was prescribed that day, kept so History can show targets after the program changes. */
+export type CompletedSession = PastSession & { note: string | null; plan?: SessionPlan };
 
 export interface ChatMessage {
   id: string;
@@ -186,6 +188,7 @@ export const useApp = create<AppState>()(
           feel: feel ?? 0,
           note,
           sets: [...active.sets].sort((a, b) => a.loggedAt.localeCompare(b.loggedAt)),
+          plan: active.plan,
         };
         set({ active: null, completed: [...get().completed, done] });
         return done;
@@ -218,18 +221,25 @@ export const useApp = create<AppState>()(
 
 /* ---------- Derived helpers ---------- */
 
-/** Today's plan for the demo. Real builds read the client's assignment from the local cache. */
+/**
+ * Today's plan from the client's assigned program (see src/programs.ts). The demo controls in Me can
+ * still force a rest day or "no program"; with no assignment at all the demo falls back to Lower A.
+ */
 export function todayPlan(mode: TodayMode): SessionPlan | null {
-  return mode === 'session' ? { ...LOWER_A, scheduledDate: isoDay(0) } : null;
+  if (mode !== 'session') return null;
+  const today = isoDay(0);
+  if (lookupDay(today).kind === 'no_program') return { ...LOWER_A, scheduledDate: today };
+  return planFor(today, useApp.getState().completed.flatMap((s) => s.sets));
 }
 
-export function historyFor(completed: CompletedSession[], programExerciseId: string): ExerciseSessionResult[] {
+/** Past results for an exercise, oldest first. Matched by exercise, so it carries across weeks and programs. */
+export function historyFor(completed: CompletedSession[], exerciseId: string): ExerciseSessionResult[] {
   return completed
     .slice()
     .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
     .map((s) => ({
       sets: s.sets
-        .filter((x) => x.programExerciseId === programExerciseId)
+        .filter((x) => x.exerciseId === exerciseId)
         .sort((a, b) => a.setIndex - b.setIndex)
         .map((x) => ({ weightKg: x.weightKg, reps: x.reps, rpe: x.rpe })),
     }))
@@ -239,13 +249,14 @@ export function historyFor(completed: CompletedSession[], programExerciseId: str
 export function suggestionFor(e: ProgramExercise, completed: CompletedSession[]): ProgressionSuggestion | null {
   const load = e.sets[0]?.loadKg;
   if (!e.progressionRule || load == null) return null;
-  return evaluateProgression(e.progressionRule, e.sets, historyFor(completed, e.id), load);
+  return evaluateProgression(e.progressionRule, e.sets, historyFor(completed, e.exerciseId), load);
 }
 
 /** Most recent logged set for the same exercise and set number ("Last time" column). */
-export function previousSet(completed: CompletedSession[], programExerciseId: string, setIndex: number): LoggedSet | undefined {
-  for (let i = completed.length - 1; i >= 0; i--) {
-    const hit = completed[i]!.sets.find((s) => s.programExerciseId === programExerciseId && s.setIndex === setIndex);
+export function previousSet(completed: CompletedSession[], exerciseId: string, setIndex: number): LoggedSet | undefined {
+  const byTime = [...completed].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  for (let i = byTime.length - 1; i >= 0; i--) {
+    const hit = byTime[i]!.sets.find((s) => s.exerciseId === exerciseId && s.setIndex === setIndex);
     if (hit) return hit;
   }
   return undefined;

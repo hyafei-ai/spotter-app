@@ -7,15 +7,20 @@ import { tenant } from '../../src/env';
 import { longDate, prescriptionLine } from '../../src/format';
 import { isFinishedToday, suggestionFor, todayPlan, useApp } from '../../src/store';
 import { DueItems } from '../../src/DueItems';
+import { lookupDay, useAssigned } from '../../src/programs';
 
 /** C-3 Today. Header is the session name, never a greeting. One primary action. */
 export default function Today() {
   const { hydrated, active, completed, demo, startSession } = useApp();
+  // Subscribing re-renders Today when the assigned program loads or the coach changes it.
+  const programLoaded = useAssigned((s) => s.loaded);
+  const assignment = useAssigned((s) => s.assignment);
+  const lookup = demo.todayMode === 'session' && programLoaded ? lookupDay() : null;
   const plan = todayPlan(demo.todayMode);
   const done = isFinishedToday(completed, plan);
   const first = tenant.coach.name.split(' ')[0];
 
-  if (!hydrated) {
+  if (!hydrated || !programLoaded) {
     return (
       <Screen>
         <View style={[styles.head, { gap: space[3] }]}>
@@ -61,6 +66,26 @@ export default function Today() {
           actionLabel={`Message ${first}`}
           onAction={() => router.push('/coach')}
         />
+      </Screen>
+    );
+  }
+
+  if (lookup && (lookup.kind === 'not_started' || lookup.kind === 'finished' || lookup.kind === 'paused')) {
+    const message =
+      lookup.kind === 'not_started' && assignment
+        ? `Your program starts on ${longDate(assignment.startDate)}. ${first} has it ready for you.`
+        : lookup.kind === 'paused'
+          ? `Coaching is paused. ${first} will let you know when it starts again.`
+          : `You’ve finished this program. ${first} will set up what’s next.`;
+    return (
+      <Screen banner={<SyncBanner />}>
+        <View style={styles.head}>
+          <Text variant="title" accessibilityRole="header">
+            {longDate(isoDay(0))}
+          </Text>
+        </View>
+        <EmptyState message={message} actionLabel={`Message ${first}`} onAction={() => router.push('/coach')} />
+        <DueItems />
       </Screen>
     );
   }

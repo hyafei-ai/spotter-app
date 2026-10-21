@@ -19,8 +19,8 @@ export default function SessionLog() {
       </Screen>
     );
   }
-  // MOCK: the demo resolves the plan locally; real builds read program_exercises from the local cache.
-  const plan = LOWER_A;
+  // Sessions keep the plan they were run against. MOCK: the seeded demo history predates that, so it uses Lower A.
+  const plan = s.plan ?? LOWER_A;
   return (
     <Screen>
       <View style={styles.nav}>{back}</View>
