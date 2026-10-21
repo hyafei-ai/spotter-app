@@ -3,7 +3,14 @@
  * Only Jordan Ellis has logged sets in the sample data, so only Jordan has a week to summarise.
  * Intake answers are invented sample answers in the default intake form's shape.
  */
-import { detectRecords, toDraftLibrary, type CheckInSummarySource, type DraftLibraryExercise, type ProgramDraftSource } from '@spotter/core';
+import {
+  checkInForSummary,
+  detectRecords,
+  toDraftLibrary,
+  type CheckInSummarySource,
+  type DraftLibraryExercise,
+  type ProgramDraftSource,
+} from '@spotter/core';
 import { usePrograms } from '../programs';
 import { DEMO_CLIENTS, DEMO_HISTORY, LOWER_A, isoDay } from '@spotter/core/demo';
 
@@ -14,16 +21,35 @@ export function demoWeek(now = new Date()): { start: string; end: string } {
   return { start: isoDay(-7, now), end: isoDay(0, now) };
 }
 
-export function demoSummarySource(clientId: string, now = new Date()): CheckInSummarySource | null {
+/** The week's check-in from the check-ins feature (coach media store), oldest first. */
+type CheckInRecord = {
+  clientId: string;
+  dueDate: string;
+  submittedAt: string;
+  answers: unknown;
+  photos: { id: string }[];
+};
+
+export function demoSummarySource(
+  clientId: string,
+  now = new Date(),
+  checkIns: CheckInRecord[] = [],
+): CheckInSummarySource | null {
   const client = DEMO_CLIENTS.find((c) => c.id === clientId);
   if (!client) return null;
   const { start, end } = demoWeek(now);
   const from = Date.parse(`${start}T00:00:00Z`);
   const isJordan = client.id === DEMO_CLIENTS[0]!.id;
-  const inWeek = isJordan ? DEMO_HISTORY.filter((s) => Date.parse(s.startedAt) >= from && Date.parse(s.startedAt) <= now.getTime() + DAY) : [];
+  const inWeek = isJordan
+    ? DEMO_HISTORY.filter(
+        (s) => Date.parse(s.startedAt) >= from && Date.parse(s.startedAt) <= now.getTime() + DAY,
+      )
+    : [];
   const before = isJordan ? DEMO_HISTORY.filter((s) => Date.parse(s.startedAt) < from) : [];
   const exerciseNames = Object.fromEntries(LOWER_A.exercises.map((e) => [e.exerciseId, e.name]));
-  const exerciseMetrics = Object.fromEntries(LOWER_A.exercises.map((e) => [e.exerciseId, e.metric]));
+  const exerciseMetrics = Object.fromEntries(
+    LOWER_A.exercises.map((e) => [e.exerciseId, e.metric]),
+  );
   const records = LOWER_A.exercises.flatMap((e) =>
     detectRecords(
       e.exerciseId,
@@ -37,23 +63,63 @@ export function demoSummarySource(clientId: string, now = new Date()): CheckInSu
     weekStart: start,
     weekEnd: end,
     sessionsPlanned: client.thisWeek.planned,
-    sessions: inWeek.map((s) => ({ title: s.title, date: s.date, feel: s.feel, note: null, sets: s.sets })),
+    sessions: inWeek.map((s) => ({
+      title: s.title,
+      date: s.date,
+      feel: s.feel,
+      note: null,
+      sets: s.sets,
+    })),
     exerciseNames,
     exerciseMetrics,
     records,
-    checkIn: null, // the check-ins feature supplies these once it is wired in
+    checkIn: (() => {
+      const mine = checkIns
+        .filter((c) => c.clientId === clientId)
+        .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+      const inWindow = mine.filter((c) => c.dueDate >= start && c.dueDate <= end);
+      const latest = inWindow[inWindow.length - 1];
+      if (!latest) return null;
+      const prev = mine.filter((c) => c.submittedAt < latest.submittedAt).pop();
+      return checkInForSummary(
+        {
+          submittedAt: latest.submittedAt,
+          answers: latest.answers,
+          photoIds: latest.photos.map((p) => p.id),
+        },
+        prev?.answers,
+      );
+    })(),
   };
 }
 
 /** MOCK: sample intake answers per demo client, in the default intake form's keys. */
-const INTAKE: Record<string, { goal: string; days: string; equipment: string; injuries: string | null }> = {
+const INTAKE: Record<
+  string,
+  { goal: string; days: string; equipment: string; injuries: string | null }
+> = {
   [DEMO_CLIENTS[0]!.id]: { goal: 'Strength', days: '3', equipment: 'Full gym', injuries: null },
   [DEMO_CLIENTS[1]!.id]: { goal: 'Muscle', days: '4', equipment: 'Full gym', injuries: null },
-  [DEMO_CLIENTS[2]!.id]: { goal: 'General', days: '2', equipment: 'Home gym', injuries: 'Lower back gets tight after long drives' },
-  [DEMO_CLIENTS[3]!.id]: { goal: 'Strength', days: '3', equipment: 'Full gym', injuries: 'Left shoulder: no overhead pressing until cleared' },
+  [DEMO_CLIENTS[2]!.id]: {
+    goal: 'General',
+    days: '2',
+    equipment: 'Home gym',
+    injuries: 'Lower back gets tight after long drives',
+  },
+  [DEMO_CLIENTS[3]!.id]: {
+    goal: 'Strength',
+    days: '3',
+    equipment: 'Full gym',
+    injuries: 'Left shoulder: no overhead pressing until cleared',
+  },
   [DEMO_CLIENTS[4]!.id]: { goal: 'Fat loss', days: '3', equipment: 'Dumbbells', injuries: null },
   [DEMO_CLIENTS[5]!.id]: { goal: 'Muscle', days: '4', equipment: 'Full gym', injuries: null },
-  [DEMO_CLIENTS[7]!.id]: { goal: 'General', days: '3', equipment: 'Full gym', injuries: 'Right knee aches on deep squats' },
+  [DEMO_CLIENTS[7]!.id]: {
+    goal: 'General',
+    days: '3',
+    equipment: 'Full gym',
+    injuries: 'Right knee aches on deep squats',
+  },
 };
 
 export function demoIntake(clientId: string) {
@@ -61,7 +127,8 @@ export function demoIntake(clientId: string) {
 }
 
 /** The coach's real library (starter set plus their own exercises), as the model sees it. */
-export const demoLibrary = (): DraftLibraryExercise[] => toDraftLibrary(usePrograms.getState().library());
+export const demoLibrary = (): DraftLibraryExercise[] =>
+  toDraftLibrary(usePrograms.getState().library());
 
 export function demoProgramSource(clientId: string, weeks: number): ProgramDraftSource | null {
   const client = DEMO_CLIENTS.find((c) => c.id === clientId);
@@ -69,7 +136,13 @@ export function demoProgramSource(clientId: string, weeks: number): ProgramDraft
   if (!client || !intake) return null;
   return {
     client: { id: client.id, fullName: client.name },
-    intake: { goal: intake.goal, daysPerWeek: Number(intake.days), equipment: intake.equipment, injuries: intake.injuries, parq: {} },
+    intake: {
+      goal: intake.goal,
+      daysPerWeek: Number(intake.days),
+      equipment: intake.equipment,
+      injuries: intake.injuries,
+      parq: {},
+    },
     weeks,
     library: demoLibrary(),
     templates: [],

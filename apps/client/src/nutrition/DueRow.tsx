@@ -3,6 +3,8 @@ import { PORTION_LABEL, formatNumber, sumMacros, sumPortions } from '@spotter/co
 import { ListRow } from '@spotter/ui';
 import { useNutritionSetup } from './setup';
 import { localDate, useNutrition } from './store';
+import { useDueVisible } from '../DueItems';
+import { isOn } from '../modules';
 
 /** Today "Due" row (C-3 / C-8). In nutrition-off mode it only ever talks about habits. */
 export function NutritionDueRow() {
@@ -10,15 +12,20 @@ export function NutritionDueRow() {
   const today = localDate();
   const entries = useNutrition((s) => s.entries);
   const checks = useNutrition((s) => s.habitChecks[today]);
-  if (!setup) return null;
+  // Tracking off (per client) or the Nutrition module off (per trainer) leaves habits only.
+  const off = !setup || setup.targets.mode === 'off' || !isOn('nutrition');
+  const habitsOnly = off && !!setup && isOn('habits') && setup.habits.length > 0;
+  useDueVisible(!!setup && (!off || habitsOnly));
+  if (!setup || (off && !habitsOnly)) return null;
   const day = entries.filter((e) => e.date === today);
   const habitsDone = setup.habits.filter((h) => checks?.[h.id]).length;
-  const habitsLine = setup.habits.length ? `${habitsDone} of ${setup.habits.length} habits done` : null;
+  const habitsLine = setup.habits.length
+    ? `${habitsDone} of ${setup.habits.length} habits done`
+    : null;
 
   let title = 'Nutrition';
   let subtitle: string | null;
-  if (setup.targets.mode === 'off') {
-    if (!setup.habits.length) return null;
+  if (off) {
     title = 'Habits';
     subtitle = habitsLine;
   } else if (setup.targets.mode === 'portions' && setup.targets.portions) {
@@ -33,7 +40,7 @@ export function NutritionDueRow() {
   return (
     <ListRow
       title={title}
-      subtitle={[subtitle, setup.targets.mode !== 'off' ? habitsLine : null].filter(Boolean).join(' · ')}
+      subtitle={[subtitle, !off && isOn('habits') ? habitsLine : null].filter(Boolean).join(' · ')}
       chevron
       onPress={() => router.push('/nutrition')}
       accessibilityHint="Opens today’s food log and habits"

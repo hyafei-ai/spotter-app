@@ -6,6 +6,7 @@ import { longDate } from '../format';
 import { useCheckIns, useDueState } from '../checkins/store';
 import { useFormChecks, useMergedChecks } from './store';
 import { loadSeenReplies, useSeenReplies } from './seen';
+import { useDueVisible } from '../DueItems';
 
 const first = () => tenant.coach.name.split(' ')[0];
 
@@ -17,13 +18,26 @@ export function CheckInDueRow() {
   useEffect(() => {
     if (!loaded) void load();
   }, [loaded, load]);
-  if (!state || (state.kind !== 'due_today' && state.kind !== 'overdue')) return null;
+  const show = !!state && (state.kind === 'due_today' || state.kind === 'overdue');
+  useDueVisible(show);
+  if (!state || !show) return null;
   const overdue = state.kind === 'overdue';
   return (
     <ListRow
       title="Weekly check-in"
-      subtitle={overdue ? `Was due ${longDate(state.dueDate)}` : 'A few minutes: weight, sleep, how the week went'}
-      right={<Tag label={overdue ? (state.days === 1 ? '1 day late' : `${state.days} days late`) : 'Due today'} tone={overdue ? 'warning' : 'brand'} />}
+      subtitle={
+        overdue
+          ? `Was due ${longDate(state.dueDate)}`
+          : 'A few minutes: weight, sleep, how the week went'
+      }
+      right={
+        <Tag
+          label={
+            overdue ? (state.days === 1 ? '1 day late' : `${state.days} days late`) : 'Due today'
+          }
+          tone={overdue ? 'warning' : 'brand'}
+        />
+      }
       chevron
       onPress={() => router.push(`/check-in/${state.dueDate}`)}
     />
@@ -39,6 +53,7 @@ export function FormCheckRequestRow() {
     if (!loaded) void load();
   }, [loaded, load]);
   const open = requests.filter((r) => !r.fulfilledBy);
+  useDueVisible(open.length > 0);
   if (!open.length) return null;
   return (
     <>
@@ -67,8 +82,10 @@ export function FormCheckReplyRow() {
     if (!loaded) void load();
     void loadSeenReplies();
   }, [loaded, load]);
-  if (!seenLoaded) return null;
-  const fresh = checks.filter((c) => c.upload.status === 'replied' && !seen.has(c.id));
+  const fresh = seenLoaded
+    ? checks.filter((c) => c.upload.status === 'replied' && !seen.has(c.id))
+    : [];
+  useDueVisible(fresh.length > 0);
   if (!fresh.length) return null;
   return (
     <>

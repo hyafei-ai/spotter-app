@@ -1,6 +1,10 @@
 // GENERATED from packages/core/src/ai.ts by scripts/sync-schemas.mjs. Do not edit.
 import { z } from 'zod';
-import { evaluateProgression, type ExerciseSessionResult, type ProgressionSuggestion } from './progression.ts';
+import {
+  evaluateProgression,
+  type ExerciseSessionResult,
+  type ProgressionSuggestion,
+} from './progression.ts';
 import type { ExerciseMetric, LoggedSet, ProgramExercise, ProgressionRule } from './schemas.ts';
 
 /**
@@ -22,7 +26,12 @@ const PHONE = /(?:\+?\d[\s().-]?){7,}\d/g;
 /** Strips emails, links and phone numbers from free text and caps its length. */
 export function redact(text: string | null | undefined, max = 600): string | null {
   if (!text) return null;
-  const clean = text.replace(EMAIL, '[email]').replace(URL_RE, '[link]').replace(PHONE, '[phone]').replace(/\s+/g, ' ').trim();
+  const clean = text
+    .replace(EMAIL, '[email]')
+    .replace(URL_RE, '[link]')
+    .replace(PHONE, '[phone]')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!clean) return null;
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 }
@@ -35,10 +44,21 @@ export interface CheckInSummarySource {
   weekStart: string; // YYYY-MM-DD
   weekEnd: string;
   sessionsPlanned: number;
-  sessions: { title: string; date: string; feel: number | null; note: string | null; sets: LoggedSet[] }[];
+  sessions: {
+    title: string;
+    date: string;
+    feel: number | null;
+    note: string | null;
+    sets: LoggedSet[];
+  }[];
   exerciseNames: Record<string, string>;
   exerciseMetrics?: Record<string, ExerciseMetric>;
-  records: { exerciseId: string; type: 'heaviest' | 'e1rm' | 'most_reps'; value: number; previous: number }[];
+  records: {
+    exerciseId: string;
+    type: 'heaviest' | 'e1rm' | 'most_reps';
+    value: number;
+    previous: number;
+  }[];
   checkIn: {
     submittedAt: string | null;
     bodyweightKg: number | null;
@@ -52,6 +72,39 @@ export interface CheckInSummarySource {
   } | null;
 }
 
+/** Self-rated adherence from the check-in form (C-7), as the 1–5 scale the summary uses. */
+const ADHERENCE_SCORE: Record<string, number> = { all: 5, most: 4, some: 2, little: 1 };
+
+/**
+ * Maps stored check-in answers (packages/core/src/checkins.ts CheckInAnswers, read loosely so older
+ * rows still work) into the summary's check-in block. Used by the Edge Function and the demo.
+ */
+export function checkInForSummary(
+  latest: { submittedAt: string | null; answers: unknown; photoIds: string[] } | null,
+  previousAnswers?: unknown,
+): CheckInSummarySource['checkIn'] {
+  if (!latest) return null;
+  const a = (latest.answers ?? {}) as Record<string, unknown>;
+  const pa = (previousAnswers ?? {}) as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const adherence =
+    typeof a.adherence === 'string' ? (ADHERENCE_SCORE[a.adherence] ?? null) : num(a.adherence);
+  const text =
+    [a.notes, a.note, a.freeText].find(
+      (v): v is string => typeof v === 'string' && v.trim().length > 0,
+    ) ?? null;
+  return {
+    submittedAt: latest.submittedAt,
+    bodyweightKg: num(a.bodyweightKg),
+    previousBodyweightKg: num(pa.bodyweightKg),
+    sleepHours: num(a.sleepHours),
+    stress: num(a.stress),
+    adherence,
+    freeText: text,
+    photoIds: latest.photoIds,
+  };
+}
+
 export const CheckInSummaryInput = z.object({
   week: z.object({ start: z.string(), end: z.string() }),
   adherence: z.object({ planned: z.number().int().min(0), done: z.number().int().min(0) }),
@@ -63,7 +116,9 @@ export const CheckInSummaryInput = z.object({
       bestSet: z.string().nullable(),
     }),
   ),
-  records: z.array(z.object({ exercise: z.string(), kind: z.string(), value: z.string(), previous: z.string() })),
+  records: z.array(
+    z.object({ exercise: z.string(), kind: z.string(), value: z.string(), previous: z.string() }),
+  ),
   sessionFeel: z.array(z.number().int().min(1).max(5)),
   sessionNotes: z.array(z.string()),
   checkIn: z
@@ -90,7 +145,9 @@ function bestSetText(sets: LoggedSet[], metric: ExerciseMetric | undefined): str
   if (metric === 'bodyweight_reps' || sets.every((s) => s.weightKg == null)) {
     return `${Math.max(...sets.map((s) => s.reps ?? 0))} reps`;
   }
-  const best = [...sets].sort((a, b) => (b.weightKg ?? 0) - (a.weightKg ?? 0) || (b.reps ?? 0) - (a.reps ?? 0))[0]!;
+  const best = [...sets].sort(
+    (a, b) => (b.weightKg ?? 0) - (a.weightKg ?? 0) || (b.reps ?? 0) - (a.reps ?? 0),
+  )[0]!;
   return `${fmt(best.weightKg ?? 0)} kg × ${best.reps ?? 0}`;
 }
 
@@ -119,11 +176,14 @@ export function buildCheckInSummaryInput(src: CheckInSummarySource): CheckInSumm
     })),
     records: src.records.map((r) => ({
       exercise: name(r.exerciseId),
-      kind: r.type === 'most_reps' ? 'most reps' : r.type === 'e1rm' ? 'estimated 1RM' : 'heaviest set',
+      kind:
+        r.type === 'most_reps' ? 'most reps' : r.type === 'e1rm' ? 'estimated 1RM' : 'heaviest set',
       value: r.type === 'most_reps' ? `${r.value} reps` : `${fmt(r.value)} kg`,
       previous: r.type === 'most_reps' ? `${r.previous} reps` : `${fmt(r.previous)} kg`,
     })),
-    sessionFeel: src.sessions.map((s) => s.feel).filter((f): f is number => f != null && f >= 1 && f <= 5),
+    sessionFeel: src.sessions
+      .map((s) => s.feel)
+      .filter((f): f is number => f != null && f >= 1 && f <= 5),
     sessionNotes: src.sessions.map((s) => redact(s.note, 280)).filter((n): n is string => !!n),
     checkIn: ci
       ? {
@@ -187,18 +247,26 @@ export function mockCheckInSummary(input: CheckInSummaryInput): CheckInSummaryOu
     lines.push(`New ${r.kind} on ${r.exercise}: ${r.value} (previous best ${r.previous}).`);
   } else if (input.exercises.length) {
     const top = [...input.exercises].sort((a, b) => b.sets - a.sets)[0]!;
-    lines.push(`Most of your work was on ${top.name}: ${top.sets} sets${top.bestSet ? `, best ${top.bestSet}` : ''}.`);
+    lines.push(
+      `Most of your work was on ${top.name}: ${top.sets} sets${top.bestSet ? `, best ${top.bestSet}` : ''}.`,
+    );
   } else {
     lines.push('No sets were logged this week.');
   }
   const ci = input.checkIn;
   if (ci?.submitted) {
     const bits: string[] = [];
-    if (ci.bodyweightChangeKg != null) bits.push(`bodyweight ${ci.bodyweightChangeKg >= 0 ? '+' : ''}${ci.bodyweightChangeKg} kg`);
+    if (ci.bodyweightChangeKg != null)
+      bits.push(`bodyweight ${ci.bodyweightChangeKg >= 0 ? '+' : ''}${ci.bodyweightChangeKg} kg`);
     if (ci.sleepHours != null) bits.push(`about ${ci.sleepHours} h sleep`);
     if (ci.stress != null) bits.push(`stress ${ci.stress}/5`);
-    lines.push(bits.length ? `From your check-in: ${bits.join(', ')}.` : 'Thanks for sending your check-in.');
-    if (ci.note) lines.push(`You mentioned: “${ci.note.length > 120 ? `${ci.note.slice(0, 119)}…` : ci.note}”`);
+    lines.push(
+      bits.length ? `From your check-in: ${bits.join(', ')}.` : 'Thanks for sending your check-in.',
+    );
+    if (ci.note)
+      lines.push(
+        `You mentioned: “${ci.note.length > 120 ? `${ci.note.slice(0, 119)}…` : ci.note}”`,
+      );
   } else {
     lines.push('Your weekly check-in hasn’t come in yet.');
   }
@@ -220,8 +288,15 @@ export interface DraftLibraryExercise {
 }
 
 /** From the coach's full library entries (packages/core/src/library.ts) to the model's minimal view. */
-export function toDraftLibrary(lib: { id: string; name: string; metric: ExerciseMetric; equipment: string[] }[]): DraftLibraryExercise[] {
-  return lib.map((e) => ({ exerciseId: e.id, name: e.name, metric: e.metric, equipment: e.equipment }));
+export function toDraftLibrary(
+  lib: { id: string; name: string; metric: ExerciseMetric; equipment: string[] }[],
+): DraftLibraryExercise[] {
+  return lib.map((e) => ({
+    exerciseId: e.id,
+    name: e.name,
+    metric: e.metric,
+    equipment: e.equipment,
+  }));
 }
 
 export interface ProgramDraftSource {
@@ -245,7 +320,14 @@ export const ProgramDraftInput = z.object({
   equipment: z.string().nullable(),
   injuries: z.string().nullable(),
   weeks: z.number().int().min(4).max(8),
-  library: z.array(z.object({ exerciseId: z.string(), name: z.string(), metric: z.string(), equipment: z.array(z.string()) })),
+  library: z.array(
+    z.object({
+      exerciseId: z.string(),
+      name: z.string(),
+      metric: z.string(),
+      equipment: z.array(z.string()),
+    }),
+  ),
   templates: z.array(z.object({ name: z.string(), dayTitles: z.array(z.string()) })),
 });
 export type ProgramDraftInput = z.infer<typeof ProgramDraftInput>;
@@ -258,7 +340,12 @@ export function buildProgramDraftInput(src: ProgramDraftSource): ProgramDraftInp
     equipment: src.intake.equipment ? String(src.intake.equipment) : null,
     injuries: redact(src.intake.injuries, 300),
     weeks: Math.min(8, Math.max(4, Math.round(src.weeks))),
-    library: src.library.map(({ exerciseId, name, metric, equipment }) => ({ exerciseId, name, metric, equipment })),
+    library: src.library.map(({ exerciseId, name, metric, equipment }) => ({
+      exerciseId,
+      name,
+      metric,
+      equipment,
+    })),
     templates: src.templates.slice(0, 10),
   });
 }
@@ -365,7 +452,10 @@ export interface DraftProgram {
   name: string;
   status: 'draft';
   source: 'ai';
-  weeks: { weekIndex: number; days: { title: string; coachNote: string | null; exercises: ProgramExercise[] }[] }[];
+  weeks: {
+    weekIndex: number;
+    days: { title: string; coachNote: string | null; exercises: ProgramExercise[] }[];
+  }[];
 }
 
 export class DraftValidationError extends Error {}
@@ -374,7 +464,11 @@ export class DraftValidationError extends Error {}
  * Turns validated model output into the program shape. Throws DraftValidationError when the model
  * used an exercise outside the library or a reps range that makes no sense, so the caller can retry once.
  */
-export function toDraftProgram(out: ProgramDraftOutput, library: DraftLibraryExercise[], newId: () => string): DraftProgram {
+export function toDraftProgram(
+  out: ProgramDraftOutput,
+  library: DraftLibraryExercise[],
+  newId: () => string,
+): DraftProgram {
   const lib = new Map(library.map((e) => [e.exerciseId, e]));
   return {
     id: newId(),
@@ -435,20 +529,25 @@ export function mockProgramDraft(input: ProgramDraftInput): ProgramDraftOutput {
     (injuries.includes('back') && /deadlift|rdl/.test(e.exerciseId));
   const usable = input.library.filter((e) => !avoid(e));
   const pool = usable.length >= 3 ? usable : input.library;
-  const titles =
-    input.templates[0]?.dayTitles.length
-      ? input.templates[0].dayTitles
-      : input.daysPerWeek <= 3
-        ? ['Full Body A', 'Full Body B', 'Full Body C']
-        : ['Lower A', 'Upper A', 'Lower B', 'Upper B', 'Full Body'];
+  const titles = input.templates[0]?.dayTitles.length
+    ? input.templates[0].dayTitles
+    : input.daysPerWeek <= 3
+      ? ['Full Body A', 'Full Body B', 'Full Body C']
+      : ['Lower A', 'Upper A', 'Lower B', 'Upper B', 'Full Body'];
   const weeks = Array.from({ length: input.weeks }, (_, w) => {
     const deload = input.weeks >= 6 && w === input.weeks - 1;
     return {
       days: Array.from({ length: input.daysPerWeek }, (_, d) => {
-        const picks = [0, 1, 2, 3].map((k) => pool[(d * 2 + k) % pool.length]!).filter((e, i, a) => a.findIndex((x) => x.exerciseId === e.exerciseId) === i);
+        const picks = [0, 1, 2, 3]
+          .map((k) => pool[(d * 2 + k) % pool.length]!)
+          .filter((e, i, a) => a.findIndex((x) => x.exerciseId === e.exerciseId) === i);
         return {
           title: titles[d % titles.length]!,
-          coachNote: deload ? 'Lighter week: same movements, stop two reps short.' : w === 0 ? 'First week: learn the movements, leave reps in the tank.' : null,
+          coachNote: deload
+            ? 'Lighter week: same movements, stop two reps short.'
+            : w === 0
+              ? 'First week: learn the movements, leave reps in the tank.'
+              : null,
           exercises: picks.map((e, i) => {
             const reps = e.metric === 'weight_reps' || e.metric === 'bodyweight_reps';
             const base = i === 0 ? 5 : 8;
@@ -487,11 +586,21 @@ export function monthStartUtc(now: Date): Date {
 export function usageState(used: number, cap: number, now: Date = new Date()): UsageState {
   const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const remaining = Math.max(0, cap - used);
-  return { used, cap, remaining, allowed: cap > 0 && used < cap, resetsOn: next.toISOString().slice(0, 10) };
+  return {
+    used,
+    cap,
+    remaining,
+    allowed: cap > 0 && used < cap,
+    resetsOn: next.toISOString().slice(0, 10),
+  };
 }
 
 export function capMessage(s: UsageState): string {
-  const d = new Date(`${s.resetsOn}T00:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const d = new Date(`${s.resetsOn}T00:00:00Z`).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  });
   return `You’ve used all ${s.cap} AI drafts for this month. They reset on ${d}. You can still write summaries yourself.`;
 }
 
@@ -512,10 +621,13 @@ export interface ChurnResult {
 /** Rule-based (no model): no app opens for 7 days, or adherence fell by half over the last three weeks. */
 export function churnRisk(s: ChurnSignals): ChurnResult {
   const reasons: ChurnResult['reasons'] = [];
-  const days = s.lastOpenAt ? (Date.parse(s.now) - Date.parse(s.lastOpenAt)) / 86_400_000 : Infinity;
+  const days = s.lastOpenAt
+    ? (Date.parse(s.now) - Date.parse(s.lastOpenAt)) / 86_400_000
+    : Infinity;
   if (days >= 7) reasons.push('no_opens_7d');
   const a = s.weeklyAdherence.slice(-3);
-  if (a.length === 3 && a[0]! >= 0.5 && a[2]! <= a[0]! / 2 && a[1]! <= a[0]!) reasons.push('falling_adherence');
+  if (a.length === 3 && a[0]! >= 0.5 && a[2]! <= a[0]! / 2 && a[1]! <= a[0]!)
+    reasons.push('falling_adherence');
   return { flag: reasons.length > 0, reasons };
 }
 
@@ -539,7 +651,10 @@ export interface ProgressionJobResult extends ProgressionSuggestion {
  */
 export function evaluateSessionProgressions(
   exercises: ProgressionJobExercise[],
-  history: Pick<LoggedSet, 'sessionId' | 'programExerciseId' | 'setIndex' | 'weightKg' | 'reps' | 'rpe' | 'loggedAt'>[],
+  history: Pick<
+    LoggedSet,
+    'sessionId' | 'programExerciseId' | 'setIndex' | 'weightKg' | 'reps' | 'rpe' | 'loggedAt'
+  >[],
 ): ProgressionJobResult[] {
   const out: ProgressionJobResult[] = [];
   for (const e of exercises) {
@@ -547,9 +662,15 @@ export function evaluateSessionProgressions(
     const bySession = new Map<string, typeof sets>();
     for (const s of sets) bySession.set(s.sessionId, [...(bySession.get(s.sessionId) ?? []), s]);
     const results: ExerciseSessionResult[] = [...bySession.values()]
-      .sort((a, b) => Math.min(...a.map((x) => Date.parse(x.loggedAt))) - Math.min(...b.map((x) => Date.parse(x.loggedAt))))
+      .sort(
+        (a, b) =>
+          Math.min(...a.map((x) => Date.parse(x.loggedAt))) -
+          Math.min(...b.map((x) => Date.parse(x.loggedAt))),
+      )
       .map((ss) => ({
-        sets: [...ss].sort((a, b) => a.setIndex - b.setIndex).map((x) => ({ weightKg: x.weightKg, reps: x.reps, rpe: x.rpe })),
+        sets: [...ss]
+          .sort((a, b) => a.setIndex - b.setIndex)
+          .map((x) => ({ weightKg: x.weightKg, reps: x.reps, rpe: x.rpe })),
       }));
     const s = evaluateProgression(e.rule, e.prescribed, results, e.currentLoadKg);
     if (s) out.push({ ...s, programExerciseId: e.programExerciseId, ruleId: e.rule.id });

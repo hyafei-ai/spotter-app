@@ -14,6 +14,7 @@ import {
 } from '@spotter/core';
 import { demoLibrary, demoProgramSource, demoSummarySource } from './demoSource';
 import { usePrograms } from '../programs';
+import { useMedia } from '../media/store';
 
 /**
  * Coach-side AI drafts (K-2). Every output is a draft until the coach taps Approve and send.
@@ -39,9 +40,30 @@ export type SummaryState =
   | { status: 'nothing'; message: string }
   | { status: 'failed'; message: string }
   | { status: 'cap'; message: string }
-  | { status: 'draft'; draftId: string; original: string; text: string; basedOn: BasedOn; createdAt: string }
-  | { status: 'sending'; draftId: string; original: string; text: string; basedOn: BasedOn; createdAt: string }
-  | { status: 'sent'; draftId: string; text: string; edited: boolean; sentAt: string; basedOn: BasedOn };
+  | {
+      status: 'draft';
+      draftId: string;
+      original: string;
+      text: string;
+      basedOn: BasedOn;
+      createdAt: string;
+    }
+  | {
+      status: 'sending';
+      draftId: string;
+      original: string;
+      text: string;
+      basedOn: BasedOn;
+      createdAt: string;
+    }
+  | {
+      status: 'sent';
+      draftId: string;
+      text: string;
+      edited: boolean;
+      sentAt: string;
+      basedOn: BasedOn;
+    };
 
 export interface BasedOn {
   sessionsDone: number;
@@ -102,22 +124,33 @@ async function callFunction<T>(name: string, body: unknown): Promise<T> {
   try {
     res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${getAccessToken() ?? ''}` },
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${getAccessToken() ?? ''}`,
+      },
       body: JSON.stringify(body),
     });
   } catch {
-    throw Object.assign(new Error('Couldn’t reach the server. Check your connection and try again.'), { code: 'offline' });
+    throw Object.assign(
+      new Error('Couldn’t reach the server. Check your connection and try again.'),
+      { code: 'offline' },
+    );
   }
   const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string } & T;
-  if (!res.ok) throw Object.assign(new Error(data.error ?? 'Something went wrong drafting this. Try again.'), { code: data.code });
+  if (!res.ok)
+    throw Object.assign(new Error(data.error ?? 'Something went wrong drafting this. Try again.'), {
+      code: data.code,
+    });
   return data;
 }
 
 /** MOCK: where the demo keeps saved program drafts for the program builder to open. */
 
 export const useAi = create<AiState>((set, get) => {
-  const setSummary = (clientId: string, s: SummaryState) => set({ summaries: { ...get().summaries, [clientId]: s } });
-  const setProgram = (clientId: string, s: ProgramState) => set({ programs: { ...get().programs, [clientId]: s } });
+  const setSummary = (clientId: string, s: SummaryState) =>
+    set({ summaries: { ...get().summaries, [clientId]: s } });
+  const setProgram = (clientId: string, s: ProgramState) =>
+    set({ programs: { ...get().programs, [clientId]: s } });
 
   return {
     summaries: {},
@@ -150,17 +183,30 @@ export const useAi = create<AiState>((set, get) => {
         if (get().simulateFailure) throw new Error('The AI service didn’t respond. Try again.');
         const cap = usageState(get().used, DEMO_MONTHLY_CAP);
         if (!cap.allowed) return setSummary(clientId, { status: 'cap', message: capMessage(cap) });
-        const src = demoSummarySource(clientId);
+        const media = useMedia.getState();
+        if (!media.loaded) await media.load();
+        const src = demoSummarySource(clientId, new Date(), useMedia.getState().checkIns);
         if (!src || src.sessions.length === 0) {
-          return setSummary(clientId, { status: 'nothing', message: 'Nothing was logged this week, so there’s nothing to summarise yet.' });
+          return setSummary(clientId, {
+            status: 'nothing',
+            message: 'Nothing was logged this week, so there’s nothing to summarise yet.',
+          });
         }
         const input = buildCheckInSummaryInput(src);
         const text = mockCheckInSummary(input).lines.join('\n');
         set({ used: get().used + 1 });
-        setSummary(clientId, { status: 'draft', draftId: uuidv7(), original: text, text, basedOn: basedOn(input), createdAt: new Date().toISOString() });
+        setSummary(clientId, {
+          status: 'draft',
+          draftId: uuidv7(),
+          original: text,
+          text,
+          basedOn: basedOn(input),
+          createdAt: new Date().toISOString(),
+        });
       } catch (err) {
         const e = err as Error & { code?: string };
-        if (e.code === 'cap_reached') return setSummary(clientId, { status: 'cap', message: e.message });
+        if (e.code === 'cap_reached')
+          return setSummary(clientId, { status: 'cap', message: e.message });
         setSummary(clientId, { status: 'failed', message: e.message });
       }
     },
@@ -191,7 +237,14 @@ export const useAi = create<AiState>((set, get) => {
         }
         const at = new Date().toISOString();
         set({ sent: [...get().sent, { id: uuidv7(), clientId, body: s.text.trim(), at }] });
-        setSummary(clientId, { status: 'sent', draftId: s.draftId, text: s.text.trim(), edited: s.text.trim() !== s.original.trim(), sentAt: at, basedOn: s.basedOn });
+        setSummary(clientId, {
+          status: 'sent',
+          draftId: s.draftId,
+          text: s.text.trim(),
+          edited: s.text.trim() !== s.original.trim(),
+          sentAt: at,
+          basedOn: s.basedOn,
+        });
       } catch (err) {
         setSummary(clientId, { ...s, status: 'draft' });
         throw err;
@@ -206,9 +259,17 @@ export const useAi = create<AiState>((set, get) => {
       setProgram(clientId, { status: 'generating' });
       try {
         if (AI_LIVE) {
-          const res = await callFunction<{ program: DraftProgram }>('ai-program-draft', { clientId, weeks });
+          const res = await callFunction<{ program: DraftProgram }>('ai-program-draft', {
+            clientId,
+            weeks,
+          });
           const programId = usePrograms.getState().importProgram(programFromAiDraft(res.program));
-          return setProgram(clientId, { status: 'ready', program: res.program, saved: true, programId });
+          return setProgram(clientId, {
+            status: 'ready',
+            program: res.program,
+            saved: true,
+            programId,
+          });
         }
         // MOCK path
         await delay(900);
@@ -219,10 +280,15 @@ export const useAi = create<AiState>((set, get) => {
         if (!src) return setProgram(clientId, { status: 'no_intake' });
         const out = mockProgramDraft(buildProgramDraftInput(src));
         set({ used: get().used + 1 });
-        setProgram(clientId, { status: 'ready', program: toDraftProgram(out, demoLibrary(), () => uuidv7()), saved: false });
+        setProgram(clientId, {
+          status: 'ready',
+          program: toDraftProgram(out, demoLibrary(), () => uuidv7()),
+          saved: false,
+        });
       } catch (err) {
         const e = err as Error & { code?: string };
-        if (e.code === 'cap_reached') return setProgram(clientId, { status: 'cap', message: e.message });
+        if (e.code === 'cap_reached')
+          return setProgram(clientId, { status: 'cap', message: e.message });
         if (e.code === 'no_intake') return setProgram(clientId, { status: 'no_intake' });
         setProgram(clientId, { status: 'failed', message: e.message });
       }

@@ -6,16 +6,28 @@ import {
   CHECK_IN_SUMMARY_JSON_SCHEMA,
   CheckInSummaryOutput,
   buildCheckInSummaryInput,
+  checkInForSummary,
   checkInSummaryPrompt,
   type CheckInSummarySource,
 } from '../_shared/core/ai.ts';
 import type { LoggedSet } from '../_shared/core/schemas.ts';
-import { MODEL, aiErrorResponse, callStructured, checkCap, cors, json, userClient } from '../_shared/ai-runtime.ts';
+import {
+  MODEL,
+  aiErrorResponse,
+  callStructured,
+  checkCap,
+  cors,
+  json,
+  userClient,
+} from '../_shared/ai-runtime.ts';
 
 const Body = z.object({
   clientId: z.string().uuid(),
   /** Monday of the week to summarise (YYYY-MM-DD). Defaults to the last 7 days. */
-  weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  weekStart: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -65,7 +77,9 @@ Deno.serve(async (req) => {
     const { data: sets, error: setErr } = ids.length
       ? await db
           .from('logged_sets')
-          .select('id, session_id, program_exercise_id, exercise_id, set_index, weight, reps, rpe, duration_s, distance_m, logged_at')
+          .select(
+            'id, session_id, program_exercise_id, exercise_id, set_index, weight, reps, rpe, duration_s, distance_m, logged_at',
+          )
           .in('session_id', ids)
           .is('voided_at', null)
       : { data: [], error: null };
@@ -76,7 +90,10 @@ Deno.serve(async (req) => {
       ? await db.from('exercises').select('id, name, default_metric').in('id', exerciseIds)
       : { data: [] };
     const { data: records } = ids.length
-      ? await db.from('personal_records').select('exercise_id, type, value, previous').in('session_id', ids)
+      ? await db
+          .from('personal_records')
+          .select('exercise_id, type, value, previous')
+          .in('session_id', ids)
       : { data: [] };
 
     // Planned sessions: days in the program week the client is on, else what they did.
@@ -90,7 +107,9 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
     if (assignment) {
-      const weekIndex = Math.floor((start.getTime() - Date.parse(`${assignment.start_date}T00:00:00Z`)) / (7 * 86_400_000));
+      const weekIndex = Math.floor(
+        (start.getTime() - Date.parse(`${assignment.start_date}T00:00:00Z`)) / (7 * 86_400_000),
+      );
       const { data: week } = await db
         .from('program_weeks')
         .select('id, program_days(id)')
@@ -122,9 +141,6 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle()
       : { data: null };
-    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-    const a = (checkIn?.answers ?? {}) as Record<string, unknown>;
-    const pa = (prevCheckIn?.answers ?? {}) as Record<string, unknown>;
 
     const toSet = (s: Record<string, unknown>): LoggedSet => ({
       id: s.id as string,
@@ -154,24 +170,33 @@ Deno.serve(async (req) => {
       })),
       exerciseNames: Object.fromEntries((exercises ?? []).map((e) => [e.id, e.name])),
       exerciseMetrics: Object.fromEntries((exercises ?? []).map((e) => [e.id, e.default_metric])),
-      records: (records ?? []).map((r) => ({ exerciseId: r.exercise_id, type: r.type, value: Number(r.value), previous: Number(r.previous) })),
-      checkIn: checkIn
-        ? {
-            submittedAt: checkIn.submitted_at as string | null,
-            bodyweightKg: num(a.bodyweightKg),
-            previousBodyweightKg: num(pa.bodyweightKg),
-            sleepHours: num(a.sleepHours),
-            stress: num(a.stress),
-            adherence: num(a.adherence),
-            freeText: typeof a.note === 'string' ? a.note : typeof a.freeText === 'string' ? a.freeText : null,
-            photoIds: (checkIn.photo_ids as string[] | null) ?? [],
-          }
-        : null,
+      records: (records ?? []).map((r) => ({
+        exerciseId: r.exercise_id,
+        type: r.type,
+        value: Number(r.value),
+        previous: Number(r.previous),
+      })),
+      checkIn: checkInForSummary(
+        checkIn
+          ? {
+              submittedAt: checkIn.submitted_at as string | null,
+              answers: checkIn.answers,
+              photoIds: (checkIn.photo_ids as string[] | null) ?? [],
+            }
+          : null,
+        prevCheckIn?.answers,
+      ),
     };
 
     const input = buildCheckInSummaryInput(source);
     const { system, user } = checkInSummaryPrompt(input);
-    const out = await callStructured({ system, user, jsonSchema: CHECK_IN_SUMMARY_JSON_SCHEMA, schema: CheckInSummaryOutput, effort: 'medium' });
+    const out = await callStructured({
+      system,
+      user,
+      jsonSchema: CHECK_IN_SUMMARY_JSON_SCHEMA,
+      schema: CheckInSummaryOutput,
+      effort: 'medium',
+    });
     const text = out.lines.join('\n');
 
     const { data: draft, error: dErr } = await db
@@ -180,14 +205,27 @@ Deno.serve(async (req) => {
         tenant_id: tenantId,
         client_id: clientId,
         kind: 'check_in_summary',
-        input_ref: { weekStart: source.weekStart, weekEnd: source.weekEnd, sessionIds: ids, checkInId: checkIn?.id ?? null },
+        input_ref: {
+          weekStart: source.weekStart,
+          weekEnd: source.weekEnd,
+          sessionIds: ids,
+          checkInId: checkIn?.id ?? null,
+        },
         output: { lines: out.lines, text },
         model: MODEL,
       })
       .select('id, status, output, created_at')
       .single();
     if (dErr) throw dErr;
-    return json(200, { draft, basedOn: { sessionsDone: ids.length, sessionsPlanned: planned, sets: sets?.length ?? 0, checkInSubmitted: !!checkIn?.submitted_at } });
+    return json(200, {
+      draft,
+      basedOn: {
+        sessionsDone: ids.length,
+        sessionsPlanned: planned,
+        sets: sets?.length ?? 0,
+        checkInSubmitted: !!checkIn?.submitted_at,
+      },
+    });
   } catch (err) {
     return aiErrorResponse(err);
   }

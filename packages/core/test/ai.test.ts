@@ -221,3 +221,25 @@ describe('redact', () => {
     expect(redact('a'.repeat(700))!.length).toBe(600);
   });
 });
+
+describe('checkInForSummary', () => {
+  it('maps check-in form answers, including the adherence scale and notes', async () => {
+    const { checkInForSummary } = await import('../src/ai');
+    const ci = checkInForSummary(
+      { submittedAt: '2026-10-19T08:00:00Z', answers: { bodyweightKg: 81.2, sleepHours: 7, stress: 2, adherence: 'most', notes: ' Knee fine ' }, photoIds: ['p1'] },
+      { bodyweightKg: 81.9 },
+    );
+    expect(ci).toEqual({
+      submittedAt: '2026-10-19T08:00:00Z',
+      bodyweightKg: 81.2,
+      previousBodyweightKg: 81.9,
+      sleepHours: 7,
+      stress: 2,
+      adherence: 4,
+      freeText: ' Knee fine ',
+      photoIds: ['p1'],
+    });
+    expect(checkInForSummary(null)).toBeNull();
+    expect(checkInForSummary({ submittedAt: null, answers: { adherence: 3, note: 'old row' }, photoIds: [] })).toMatchObject({ adherence: 3, freeText: 'old row', bodyweightKg: null });
+  });
+});

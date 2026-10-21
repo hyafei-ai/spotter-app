@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View, type ScrollViewInstance } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type ScrollViewInstance,
+} from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
@@ -35,6 +42,7 @@ import {
 } from '@spotter/ui';
 import { SyncBanner } from '../../../src/SyncBanner';
 import { tenant } from '../../../src/env';
+import { isOn } from '../../../src/modules';
 import { prescribed, resultText, targetText, w } from '../../../src/format';
 import { previousSet, suggestionFor, useApp } from '../../../src/store';
 
@@ -73,7 +81,8 @@ export default function Logger() {
     return exercise ? { exercise, setIndex: Number(idx), key: currentKey } : null;
   }, [session, currentKey]);
 
-  const suggestion = (e: ProgramExercise) => (session?.keptLoad[e.id] ? null : suggestionFor(e, completed));
+  const suggestion = (e: ProgramExercise) =>
+    session?.keptLoad[e.id] ? null : suggestionFor(e, completed);
 
   // Entry fields start at the prescription (UX C2: one tap when you did what was prescribed),
   // or at what was logged when editing. User edits are kept per set until it changes.
@@ -81,7 +90,13 @@ export default function Logger() {
     if (!current) return null;
     const existing = logged.get(current.key);
     if (existing) {
-      return { weightKg: existing.weightKg, reps: existing.reps, rpe: existing.rpe, durationS: existing.durationS, distanceM: existing.distanceM };
+      return {
+        weightKg: existing.weightKg,
+        reps: existing.reps,
+        rpe: existing.rpe,
+        durationS: existing.durationS,
+        distanceM: existing.distanceM,
+      };
     }
     const e = current.exercise;
     const prev = previousSet(completed, e.exerciseId, current.setIndex);
@@ -89,7 +104,9 @@ export default function Logger() {
     const earlier = [...logged.values()]
       .filter((s) => s.programExerciseId === e.id && s.setIndex < current.setIndex)
       .sort((a, b) => b.setIndex - a.setIndex)[0];
-    const suggested = session?.keptLoad[e.id] ? null : suggestionFor(e, completed)?.suggestedLoadKg ?? null;
+    const suggested = session?.keptLoad[e.id]
+      ? null
+      : (suggestionFor(e, completed)?.suggestedLoadKg ?? null);
     const base = defaultEntry(e, current.setIndex, prev, suggested);
     const p = e.sets.find((s) => s.index === current.setIndex);
     return {
@@ -118,7 +135,11 @@ export default function Logger() {
   if (!session) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.paper, paddingTop: insets.top + space[8] }}>
-        <EmptyState message="This session isn’t open on this phone any more." actionLabel="Back to Today" onAction={() => router.replace('/today')} />
+        <EmptyState
+          message="This session isn’t open on this phone any more."
+          actionLabel="Back to Today"
+          onAction={() => router.replace('/today')}
+        />
       </View>
     );
   }
@@ -130,7 +151,8 @@ export default function Logger() {
   const skipRest = async () => {
     const nid = session.restNotificationId;
     setRest(null, null);
-    if (nid && Platform.OS !== 'web') await Notifications.cancelScheduledNotificationAsync(nid).catch(() => {});
+    if (nid && Platform.OS !== 'web')
+      await Notifications.cancelScheduledNotificationAsync(nid).catch(() => {});
   };
 
   const startRest = async (seconds: number, nextName: string | null) => {
@@ -140,7 +162,10 @@ export default function Logger() {
     if (Platform.OS !== 'web') {
       nid = await Notifications.scheduleNotificationAsync({
         content: { title: 'Rest is up', body: nextName ? `Next: ${nextName}` : 'Back to it.' },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: Math.round(seconds) },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: Math.round(seconds),
+        },
       }).catch(() => null);
     }
     setRest(Date.now() + seconds * 1000, nid);
@@ -178,7 +203,10 @@ export default function Logger() {
     });
     if (!isEdit) {
       const after = nextSlot(session.plan, new Map([...logged, [key, {} as never]]));
-      void startRest(e.restS, after ? (session.swaps[after.exercise.id]?.name ?? after.exercise.name) : null);
+      void startRest(
+        e.restS,
+        after ? (session.swaps[after.exercise.id]?.name ?? after.exercise.name) : null,
+      );
       if (after && after.exercise.id !== e.id) {
         const y = blockY.current[after.exercise.id];
         if (y != null) scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
@@ -192,7 +220,11 @@ export default function Logger() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper, paddingTop: insets.top }}>
       <View style={styles.header}>
-        <IconButton icon="x" label="Close. Your session stays open." onPress={() => (router.canGoBack() ? router.back() : router.replace('/today'))} />
+        <IconButton
+          icon="x"
+          label="Close. Your session stays open."
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/today'))}
+        />
         <View style={{ flex: 1 }}>
           <Text variant="title" accessibilityRole="header" numberOfLines={1}>
             {session.plan.title}
@@ -201,7 +233,12 @@ export default function Logger() {
             {logged.size} of {planned} sets
           </Text>
         </View>
-        <Pressable accessibilityRole="button" onPress={() => router.push(`/session/${session.sessionId}/finish`)} hitSlop={8} style={styles.finishLink}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push(`/session/${session.sessionId}/finish`)}
+          hitSlop={8}
+          style={styles.finishLink}
+        >
           <Text variant="bodyStrong" style={{ color: colors.brand }}>
             Finish
           </Text>
@@ -214,7 +251,11 @@ export default function Logger() {
           const s = suggestion(e);
           const swap = session.swaps[e.id];
           return (
-            <View key={e.id} onLayout={(ev) => (blockY.current[e.id] = ev.nativeEvent.layout.y)} style={styles.block}>
+            <View
+              key={e.id}
+              onLayout={(ev) => (blockY.current[e.id] = ev.nativeEvent.layout.y)}
+              style={styles.block}
+            >
               <View style={styles.exHead}>
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text variant="headline">{swap?.name ?? e.name}</Text>
@@ -230,21 +271,41 @@ export default function Logger() {
                     </Text>
                   ) : null}
                 </View>
-                <IconButton
-                  icon="video"
-                  label={`Send a form check of ${swap?.name ?? e.name}`}
-                  onPress={() => {
-                    // Attach to the set in progress, else the last one logged for this exercise.
-                    const done = session.sets.filter((x) => x.programExerciseId === e.id).map((x) => x.setIndex);
-                    const setIdx = current?.exercise.id === e.id ? current.setIndex : done.length ? Math.max(...done) : '';
-                    router.push(`/form-check/new?pe=${e.id}&set=${setIdx}`);
-                  }}
-                />
-                {e.alternatives.length ? <IconButton icon="repeat" label={`Swap ${e.name} for an approved alternative`} onPress={() => setSwapFor(e)} /> : null}
+                {isOn('formChecks') ? (
+                  <IconButton
+                    icon="video"
+                    label={`Send a form check of ${swap?.name ?? e.name}`}
+                    onPress={() => {
+                      // Attach to the set in progress, else the last one logged for this exercise.
+                      const done = session.sets
+                        .filter((x) => x.programExerciseId === e.id)
+                        .map((x) => x.setIndex);
+                      const setIdx =
+                        current?.exercise.id === e.id
+                          ? current.setIndex
+                          : done.length
+                            ? Math.max(...done)
+                            : '';
+                      router.push(`/form-check/new?pe=${e.id}&set=${setIdx}`);
+                    }}
+                  />
+                ) : null}
+                {e.alternatives.length ? (
+                  <IconButton
+                    icon="repeat"
+                    label={`Swap ${e.name} for an approved alternative`}
+                    onPress={() => setSwapFor(e)}
+                  />
+                ) : null}
               </View>
 
               {s ? (
-                <View style={[styles.suggest, { borderLeftColor: colors.brand, backgroundColor: colors.surface }]}>
+                <View
+                  style={[
+                    styles.suggest,
+                    { borderLeftColor: colors.brand, backgroundColor: colors.surface },
+                  ]}
+                >
                   <Text variant="label" style={{ color: colors.brand }}>
                     Suggested — your coach approved this rule
                   </Text>
@@ -254,7 +315,12 @@ export default function Logger() {
                   <Text variant="callout" color="ink2">
                     {s.reason}
                   </Text>
-                  <Pressable onPress={() => keepLoad(e.id)} accessibilityRole="button" hitSlop={8} style={{ alignSelf: 'flex-start', paddingVertical: space[1] }}>
+                  <Pressable
+                    onPress={() => keepLoad(e.id)}
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    style={{ alignSelf: 'flex-start', paddingVertical: space[1] }}
+                  >
                     <Text variant="bodyStrong" style={{ color: colors.brand }}>
                       Keep {prescribed(s.previousLoadKg)}
                     </Text>
@@ -273,7 +339,13 @@ export default function Logger() {
                   Last time
                 </Text>
                 <Text variant="label" color="ink2" style={{ flex: 1.1, textAlign: 'right' }}>
-                  {e.metric === 'weight_reps' ? `${unit} × reps` : e.metric === 'distance' ? 'Metres' : e.metric === 'time' ? 'Seconds' : 'Reps'}
+                  {e.metric === 'weight_reps'
+                    ? `${unit} × reps`
+                    : e.metric === 'distance'
+                      ? 'Metres'
+                      : e.metric === 'time'
+                        ? 'Seconds'
+                        : 'Reps'}
                 </Text>
               </View>
 
@@ -293,7 +365,15 @@ export default function Logger() {
                     justLogged={justLogged === key}
                     onPress={() => setSelected(key)}
                   >
-                    {isCurrent && entry ? <EntryFields exercise={e} entry={entry} onChange={setEntry} unit={unit} inc={inc} /> : null}
+                    {isCurrent && entry ? (
+                      <EntryFields
+                        exercise={e}
+                        entry={entry}
+                        onChange={setEntry}
+                        unit={unit}
+                        inc={inc}
+                      />
+                    ) : null}
                   </SetRow>
                 );
               })}
@@ -302,11 +382,24 @@ export default function Logger() {
         })}
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[3]), borderTopColor: colors.line, backgroundColor: colors.paper }]}>
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingBottom: Math.max(insets.bottom, space[3]),
+            borderTopColor: colors.line,
+            backgroundColor: colors.paper,
+          },
+        ]}
+      >
         {restLeft > 0 ? (
           <View style={styles.rest} accessibilityLiveRegion="polite">
             <Feather name="clock" size={16} color={colors.ink2} />
-            <Text variant="bodyStrong" tabular accessibilityLabel={`Rest, ${Math.ceil(restLeft)} seconds left`}>
+            <Text
+              variant="bodyStrong"
+              tabular
+              accessibilityLabel={`Rest, ${Math.ceil(restLeft)} seconds left`}
+            >
               Rest {formatRestClock(restLeft)}
             </Text>
             <View style={{ flex: 1 }} />
@@ -324,20 +417,36 @@ export default function Logger() {
             onPress={() => void log()}
           />
         ) : allDone ? (
-          <Button label="Finish session" onPress={() => router.push(`/session/${session.sessionId}/finish`)} />
+          <Button
+            label="Finish session"
+            onPress={() => router.push(`/session/${session.sessionId}/finish`)}
+          />
         ) : null}
       </View>
 
-      <Sheet visible={!!swapFor} title={swapFor ? `Swap ${swapFor.name}` : ''} onClose={() => setSwapFor(null)}>
+      <Sheet
+        visible={!!swapFor}
+        title={swapFor ? `Swap ${swapFor.name}` : ''}
+        onClose={() => setSwapFor(null)}
+      >
         {swapFor ? (
           <>
-            <Text variant="callout" color="ink2" style={{ paddingHorizontal: margin, paddingBottom: space[2] }}>
-              These alternatives are approved by {tenant.coach.name.split(' ')[0]}. Your targets stay the same.
+            <Text
+              variant="callout"
+              color="ink2"
+              style={{ paddingHorizontal: margin, paddingBottom: space[2] }}
+            >
+              These alternatives are approved by {tenant.coach.name.split(' ')[0]}. Your targets
+              stay the same.
             </Text>
             <ListRow
               title={swapFor.name}
               subtitle="As programmed"
-              right={!session.swaps[swapFor.id] ? <Feather name="check" size={20} color={colors.brand} /> : undefined}
+              right={
+                !session.swaps[swapFor.id] ? (
+                  <Feather name="check" size={20} color={colors.brand} />
+                ) : undefined
+              }
               onPress={() => {
                 swapExercise(swapFor.id, null);
                 setSwapFor(null);
@@ -347,7 +456,11 @@ export default function Logger() {
               <ListRow
                 key={a.exerciseId}
                 title={a.name}
-                right={session.swaps[swapFor.id]?.exerciseId === a.exerciseId ? <Feather name="check" size={20} color={colors.brand} /> : undefined}
+                right={
+                  session.swaps[swapFor.id]?.exerciseId === a.exerciseId ? (
+                    <Feather name="check" size={20} color={colors.brand} />
+                  ) : undefined
+                }
                 last={i === swapFor.alternatives.length - 1}
                 onPress={() => {
                   swapExercise(swapFor.id, a);
@@ -406,13 +519,34 @@ function EntryFields({
           />
         ) : null}
         {e.metric === 'weight_reps' || e.metric === 'bodyweight_reps' ? (
-          <Stepper label="Reps" unitLabel="reps" value={entry.reps ?? 0} step={1} max={100} onChange={(reps) => onChange({ ...entry, reps })} />
+          <Stepper
+            label="Reps"
+            unitLabel="reps"
+            value={entry.reps ?? 0}
+            step={1}
+            max={100}
+            onChange={(reps) => onChange({ ...entry, reps })}
+          />
         ) : null}
         {e.metric === 'distance' ? (
-          <Stepper label="Distance (m)" unitLabel="metres" value={entry.distanceM ?? 0} step={5} max={5000} onChange={(distanceM) => onChange({ ...entry, distanceM })} />
+          <Stepper
+            label="Distance (m)"
+            unitLabel="metres"
+            value={entry.distanceM ?? 0}
+            step={5}
+            max={5000}
+            onChange={(distanceM) => onChange({ ...entry, distanceM })}
+          />
         ) : null}
         {e.metric === 'time' ? (
-          <Stepper label="Time (s)" unitLabel="seconds" value={entry.durationS ?? 0} step={5} max={3600} onChange={(durationS) => onChange({ ...entry, durationS })} />
+          <Stepper
+            label="Time (s)"
+            unitLabel="seconds"
+            value={entry.durationS ?? 0}
+            step={5}
+            max={3600}
+            onChange={(durationS) => onChange({ ...entry, durationS })}
+          />
         ) : null}
       </View>
       {e.trackRpe ? (
@@ -433,14 +567,44 @@ function EntryFields({
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[2], paddingVertical: space[2], gap: space[1] },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: space[2],
+    paddingVertical: space[2],
+    gap: space[1],
+  },
   finishLink: { paddingHorizontal: space[3], minHeight: 44, justifyContent: 'center' },
   block: { paddingTop: space[5] },
-  exHead: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: margin, gap: space[2] },
+  exHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: margin,
+    gap: space[2],
+  },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: space[1] },
-  suggest: { marginHorizontal: margin, marginTop: space[3], padding: space[3], borderLeftWidth: 3, borderRadius: 6, gap: 2 },
-  cols: { flexDirection: 'row', paddingHorizontal: margin, paddingTop: space[4], paddingBottom: space[1], gap: space[3], borderBottomWidth: StyleSheet.hairlineWidth },
+  suggest: {
+    marginHorizontal: margin,
+    marginTop: space[3],
+    padding: space[3],
+    borderLeftWidth: 3,
+    borderRadius: 6,
+    gap: 2,
+  },
+  cols: {
+    flexDirection: 'row',
+    paddingHorizontal: margin,
+    paddingTop: space[4],
+    paddingBottom: space[1],
+    gap: space[3],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   steppers: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
-  footer: { paddingHorizontal: margin, paddingTop: space[3], borderTopWidth: StyleSheet.hairlineWidth, gap: space[2] },
+  footer: {
+    paddingHorizontal: margin,
+    paddingTop: space[3],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: space[2],
+  },
   rest: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 32 },
 });

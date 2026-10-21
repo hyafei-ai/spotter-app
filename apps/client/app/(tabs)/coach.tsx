@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { IconButton, Monogram, Text, TextField, useTheme, margin, radius, space, Screen } from '@spotter/ui';
 import { SyncBanner } from '../../src/SyncBanner';
 import { tenant } from '../../src/env';
+import { isOn } from '../../src/modules';
 import { useApp, type ChatMessage } from '../../src/store';
 import { useSync, syncQueue } from '../../src/sync';
 
@@ -49,7 +50,7 @@ export default function CoachThread() {
             Usually replies within a day
           </Text>
         </View>
-        <IconButton icon="video" label="Form checks" onPress={() => router.push('/form-check')} />
+        {isOn('formChecks') ? <IconButton icon="video" label="Form checks" onPress={() => router.push('/form-check')} /> : null}
       </View>
       {messages.length === 0 ? (
         <Text color="ink2" style={{ padding: margin }}>
