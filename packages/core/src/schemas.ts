@@ -129,6 +129,32 @@ export const Mutation = z.discriminatedUnion('kind', [
       appVersion: z.string(),
     }),
   }),
+  z.object({
+    ...base,
+    kind: z.literal('formcheck.create'),
+    payload: z.object({
+      formCheckId: uuid,
+      videoId: uuid,
+      exerciseId: z.string().min(1),
+      sessionId: uuid.nullable(),
+      programExerciseId: uuid.nullable(),
+      setIndex: z.number().int().min(0).nullable(),
+      durationMs: z.number().int().min(1).max(60_500),
+      clientNote: z.string().max(1000).nullable(),
+      createdAt: isoDateTime,
+    }),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal('checkin.submit'),
+    payload: z.object({
+      checkInId: uuid,
+      dueDate: isoDate,
+      answers: z.record(z.string(), z.unknown()),
+      photoIds: z.array(uuid).max(3),
+      submittedAt: isoDateTime,
+    }),
+  }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];
@@ -157,3 +183,28 @@ export const TriageReason = z.enum([
   'new_client',
 ]);
 export type TriageReason = z.infer<typeof TriageReason>;
+
+/* ---------- Media (form checks, progress photos) ---------- */
+
+/** POST /videos-upload-url: start a resumable upload. */
+export const VideoUploadRequest = z.object({
+  action: z.literal('start'),
+  videoId: uuid,
+  kind: z.enum(['form_check', 'voice_over', 'demo']),
+  contentType: z.string().regex(/^(video|audio)\//),
+  sizeBytes: z.number().int().positive().max(500 * 1024 * 1024),
+  durationMs: z.number().int().positive().max(60_500),
+});
+/** POST /videos-upload-url with action "complete": the tus upload finished; create the Mux asset. */
+export const VideoUploadComplete = z.object({ action: z.literal('complete'), videoId: uuid });
+export const VideoUploadBody = z.discriminatedUnion('action', [VideoUploadRequest, VideoUploadComplete]);
+export type VideoUploadBody = z.infer<typeof VideoUploadBody>;
+
+/** POST /media-signed-url: a short-lived playback or view link for private media the caller may see. */
+export const SignedUrlRequest = z.object({
+  kind: z.enum(['video', 'progress_photo']),
+  id: uuid,
+});
+export type SignedUrlRequest = z.infer<typeof SignedUrlRequest>;
+/** Private media links never outlive an hour (Security and privacy). */
+export const SIGNED_URL_MAX_S = 3600;

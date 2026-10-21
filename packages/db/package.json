@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test": "bash scripts/test-local.sh",
+    "test": "bash scripts/test-local.sh && pnpm run test:functions",
+    "test:functions": "node --experimental-strip-types --no-warnings --test supabase/functions/_shared/*.test.ts",
     "sync-schemas": "node scripts/sync-schemas.mjs"
   }
 }

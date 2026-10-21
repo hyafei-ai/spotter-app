@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 import { SectionLabel } from '@spotter/ui';
+import { CheckInDueRow, FormCheckReplyRow, FormCheckRequestRow } from './formchecks/DueRows';
 
 /**
  * Today's "Due" list (C-3): weekly check-in, form check requested, habit tasks, nutrition.
@@ -7,6 +8,9 @@ import { SectionLabel } from '@spotter/ui';
  */
 const DUE_ROWS: React.ComponentType[] = [
   // feature rows: add one line per feature, e.g. CheckInDueRow,
+  CheckInDueRow,
+  FormCheckRequestRow,
+  FormCheckReplyRow,
 ];
 
 export function DueItems() {

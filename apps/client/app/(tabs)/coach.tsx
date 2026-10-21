@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { IconButton, Monogram, Text, TextField, useTheme, margin, radius, space, Screen } from '@spotter/ui';
 import { SyncBanner } from '../../src/SyncBanner';
 import { tenant } from '../../src/env';
@@ -40,7 +41,7 @@ export default function CoachThread() {
     >
       <View style={[styles.head, { borderBottomColor: colors.line }]}>
         <Monogram initials={coach.monogram} size={40} label={coach.name} />
-        <View>
+        <View style={{ flex: 1 }}>
           <Text variant="headline" accessibilityRole="header">
             {coach.name}
           </Text>
@@ -48,6 +49,7 @@ export default function CoachThread() {
             Usually replies within a day
           </Text>
         </View>
+        <IconButton icon="video" label="Form checks" onPress={() => router.push('/form-check')} />
       </View>
       {messages.length === 0 ? (
         <Text color="ink2" style={{ padding: margin }}>
