@@ -33,7 +33,9 @@ export async function loadCoachData(): Promise<void> {
       thisWeek: { planned: 0, done: 0 },
       lastSession: null,
     }));
-  const items: TriageItem[] = (triage.data ?? []).map((t: { id: string; client_id: string; reason_code: TriageReason; detail: { count?: number }; since: string; snoozed_until: string | null; handled_at: string | null }) => ({
+  type TriageRow = { id: string; client_id: string; reason_code: TriageReason; detail: { count?: number; text?: string; clientName?: string; interventionId?: string }; since: string; snoozed_until: string | null; handled_at: string | null; coach_id?: string | null };
+  const triageRows = (triage.data ?? []) as TriageRow[];
+  const items: TriageItem[] = triageRows.map((t) => ({
     id: t.id,
     clientId: t.client_id,
     reason: t.reason_code,
@@ -41,7 +43,17 @@ export async function loadCoachData(): Promise<void> {
     since: t.since,
     snoozedUntil: t.snoozed_until,
     handledAt: t.handled_at,
+    // Check-in requests from the owner (retention): ready-made text and who it's addressed to.
+    detail: t.detail?.text,
+    coachId: t.coach_id ?? null,
+    interventionId: t.detail?.interventionId,
   }));
+  // A coach asked to check in on someone they don't coach still needs the member in their list.
+  for (const t of triageRows) {
+    if (t.reason_code === 'check_in_request' && !clients.some((c) => c.id === t.client_id)) {
+      clients.push({ id: t.client_id, name: t.detail?.clientName || 'Member', plan: '—', startDate: t.since.slice(0, 10), status: 'active', flags: [], thisWeek: { planned: 0, done: 0 }, lastSession: null });
+    }
+  }
   useCoach.setState({ clients, triage: items });
 
   const coaches: Coach[] = rows

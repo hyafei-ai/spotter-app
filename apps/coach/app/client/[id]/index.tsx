@@ -6,6 +6,9 @@ import { Button, EmptyState, IconButton, ListRow, Monogram, Screen, SectionLabel
 import { tenant } from '../../../src/env';
 import { initials, useCoach } from '../../../src/store';
 import { ClientSections } from '../../../src/ClientSections';
+import { useCheckInDone } from '../../../src/retention/CheckInDone';
+import { triageForViewer } from '../../../src/retention/store';
+import { useRole } from '../../../src/platform/team';
 
 /** K-3 client detail. */
 export default function ClientDetail() {
@@ -14,6 +17,8 @@ export default function ClientDetail() {
   const toast = useToast();
   const { clients, triage, notes, setNote, setPaused, markHandled, restore } = useCoach();
   const c = clients.find((x) => x.id === id);
+  const checkIn = useCheckInDone();
+  const { viewerId } = useRole();
   const back = <IconButton icon="arrow-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/clients'))} />;
 
   if (!c) {
@@ -25,7 +30,7 @@ export default function ClientDetail() {
     );
   }
 
-  const open = buildTriage(triage).find((r) => r.clientId === c.id);
+  const open = buildTriage(triageForViewer(triage, viewerId)).find((r) => r.clientId === c.id);
   // MOCK: only the demo client (Jordan) has logged sessions in the sample data.
   const logs = c.id === DEMO_CLIENTS[0]!.id ? [...DEMO_HISTORY].reverse() : [];
   const paused = c.status === 'paused';
@@ -83,6 +88,8 @@ export default function ClientDetail() {
                 style={{ color: colors.brand }}
                 accessibilityRole="button"
                 onPress={() => {
+                  // The owner asked for a check-in: record how it happened first.
+                  if (checkIn.ask(c.name, open.items, () => markHandled(c.id))) return;
                   const items = markHandled(c.id);
                   toast({ message: 'Marked handled', actionLabel: 'Undo', onAction: () => restore(items) });
                 }}
@@ -141,6 +148,7 @@ export default function ClientDetail() {
       <View style={[styles.body, { paddingTop: space[6] }]}>
         <Button label={paused ? 'Resume coaching' : 'Pause coaching'} kind="secondary" onPress={togglePause} />
       </View>
+      {checkIn.sheet}
     </Screen>
   );
 }

@@ -24,6 +24,9 @@ export interface TriageItem {
   handledAt: string | null;
   /** Ready-made line, e.g. "Maya asked you to check in: no session in 12 days". */
   detail?: string;
+  /** Check-in requests: the coach it's addressed to, and the intervention to complete. */
+  coachId?: string | null;
+  interventionId?: string;
 }
 
 const DAY = 86_400_000;

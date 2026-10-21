@@ -1,5 +1,5 @@
 // GENERATED from packages/core/src/retention.ts by scripts/sync-schemas.mjs. Do not edit.
-import { monthlyRevenueCents, type SubscriptionLike } from './grow.ts';
+import { formatMoney, monthlyRevenueCents, type Currency, type SubscriptionLike } from './grow.ts';
 import { interventionOutcome, memberRisk, yearlyValueCents, type InterventionOutcome, type MemberRisk, type MemberSignals } from './signals.ts';
 
 /**
@@ -95,15 +95,40 @@ export function membersToTalkTo(activity: MemberActivity[], today: string): Memb
   return { members, tooNew: live.filter((a) => tenure(a) < MIN_TENURE_DAYS).length, considered: live.length };
 }
 
+/** "≈ $1,920", rounded to whole units: these are estimates. */
+export function approxMoney(cents: number, currency: Currency | string): string {
+  const c = (['usd', 'gbp', 'eur', 'cad', 'aud'] as const).find((x) => x === currency) ?? 'usd';
+  return `≈ ${formatMoney(Math.round(cents / 100) * 100, c)}`;
+}
+
+/** The assumption behind a yearly figure, spelled out next to it. */
+export function yearlyAssumption(monthlyCents: number, currency: Currency | string): string {
+  const c = (['usd', 'gbp', 'eur', 'cad', 'aud'] as const).find((x) => x === currency) ?? 'usd';
+  return `their plan works out to ${formatMoney(Math.round(monthlyCents / 100) * 100, c)} a month × 12`;
+}
+
+/**
+ * What Spotter costs the owner per month, for the optional "Spotter costs ≈ $X a year" line.
+ * Pricing is still an open question in the spec, so this stays null and the line stays hidden.
+ */
+export const SPOTTER_PRICE_MONTHLY_CENTS: number | null = null;
+
 /* ---------- handing to a coach, and what happened ---------- */
 
 export type InterventionAction = 'message' | 'call' | 'session' | 'other';
 export const INTERVENTION_ACTIONS: { value: InterventionAction; label: string }[] = [
   { value: 'message', label: 'Message' },
   { value: 'call', label: 'Call' },
-  { value: 'session', label: 'At a session' },
+  { value: 'session', label: 'Session' },
   { value: 'other', label: 'Other' },
 ];
+/** Past tense for the kept list: "Leo · called on May 23". */
+export const INTERVENTION_DONE_LABEL: Record<InterventionAction, string> = {
+  message: 'messaged',
+  call: 'called',
+  session: 'talked at a session',
+  other: 'checked in',
+};
 
 export interface Intervention {
   id: string;
@@ -126,6 +151,10 @@ export interface Intervention {
 export function checkInRequestText(ownerFirstName: string, topReason: string): string {
   return `${ownerFirstName} asked you to check in: ${topReason.charAt(0).toLowerCase()}${topReason.slice(1)}`;
 }
+
+/** Shown with every kept figure, word for word. */
+export const KEPT_CAVEAT =
+  'Members still with you 60 days after a coach checked in. This shows they stayed, not that the check-in alone kept them.';
 
 export interface KeptRow extends Intervention {
   outcome: InterventionOutcome | 'waiting';
