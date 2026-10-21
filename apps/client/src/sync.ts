@@ -3,6 +3,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { create } from 'zustand';
 import { SyncPushResponse, SyncQueue, type Mutation, type SyncStatus, type SyncTransport } from '@spotter/core';
 import { queueStore } from './storage';
+import { recordAppOpen } from './appOpen';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 
@@ -58,11 +59,15 @@ export async function startSync(): Promise<void> {
     if (online && !was) void syncQueue.wake();
   });
   AppState.addEventListener('change', (s) => {
-    if (s === 'active') void syncQueue.flush();
+    if (s === 'active') {
+      void recordAppOpen();
+      void syncQueue.flush();
+    }
   });
   setInterval(() => {
     if (useSync.getState().online) void syncQueue.flush();
   }, 30_000);
+  await recordAppOpen();
   void syncQueue.flush();
 }
 

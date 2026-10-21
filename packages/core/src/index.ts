@@ -12,3 +12,4 @@ export * from './intake';
 export * from './programs';
 export * from './formchecks';
 export * from './checkins';
+export * from './ai';

@@ -3,6 +3,7 @@ import { FlatList, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconButton, Screen, Text, TextField, useTheme, margin, radius, space } from '@spotter/ui';
 import { useCoach } from '../../../src/store';
+import { useSentMessages } from '../../../src/ai/store';
 
 interface Msg {
   id: string;
@@ -16,7 +17,10 @@ export default function Thread() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const c = useCoach((s) => s.clients.find((x) => x.id === id));
-  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [typed, setMsgs] = useState<Msg[]>([]);
+  // Approved AI summaries land here as the coach's own messages.
+  const approved = useSentMessages(id ?? '');
+  const msgs: Msg[] = [...approved.map((m) => ({ id: m.id, mine: true, body: m.body, at: m.at })), ...typed].sort((a, b) => a.at.localeCompare(b.at));
   const [draft, setDraft] = useState('');
   const first = c?.name.split(' ')[0] ?? 'client';
 

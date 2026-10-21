@@ -156,6 +156,8 @@ export const Mutation = z.discriminatedUnion('kind', [
       submittedAt: isoDateTime,
     }),
   }),
+  // AI (churn signal): the client opened the app. Sent at most every few hours.
+  z.object({ ...base, kind: z.literal('app.open'), payload: z.object({ openedAt: isoDateTime }) }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];
