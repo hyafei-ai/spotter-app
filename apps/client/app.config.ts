@@ -40,7 +40,11 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       { image: `./assets/tenants/${tenant.slug}/splash.png`, imageWidth: 160, backgroundColor: '#F3EFE7', dark: { backgroundColor: '#171614' } },
-    ], ['expo-notifications', { color: tenant.brandColor }], 'expo-font'],
+    ], ['expo-notifications', { color: tenant.brandColor }], 'expo-font',
+    ['expo-camera', { cameraPermission: 'Scan food barcodes and record sets for your coach.', recordAudioAndroid: true }],
+    ['@kingstinct/react-native-healthkit', { NSHealthShareUsageDescription: 'Read your steps, bodyweight and sleep so your coach can see them next to your training.', NSHealthUpdateUsageDescription: false, background: false }],
+    'expo-health-connect',
+  ],
   experiments: { typedRoutes: false, ...(baseUrl ? { baseUrl } : {}) },
   updates: { requestHeaders: { 'expo-channel-name': tenant.updateChannel } },
   extra: {

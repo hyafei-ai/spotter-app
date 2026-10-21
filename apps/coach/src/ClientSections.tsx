@@ -1,6 +1,7 @@
 import { ProgramSection } from './ProgramSection';
 import { CheckInsSection, FormChecksSection } from './media/sections';
 import { AiSection } from './ai/AiSection';
+import { NutritionSection } from './nutrition/NutritionSection';
 
 /**
  * Feature sections on the coach's client detail (K-3): program, check-ins, form checks, nutrition,
@@ -12,6 +13,7 @@ const SECTIONS: React.ComponentType<{ clientId: string }>[] = [
   FormChecksSection,
   CheckInsSection,
   AiSection,
+  NutritionSection,
 ];
 
 export function ClientSections({ clientId }: { clientId: string }) {

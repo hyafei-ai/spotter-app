@@ -1,0 +1,46 @@
+{
+  "_fixture": "Hand-written in the shape of USDA FoodData Central POST /fdc/v1/foods/search. Invented test data. Covers a Foundation food (nutrientNumber only), a Branded food (ALL CAPS, gtinUpc, servingSize in g, nutrientId only, a kJ row) and an SR Legacy food missing fat (skipped).",
+  "totalHits": 3,
+  "currentPage": 1,
+  "totalPages": 1,
+  "foods": [
+    {
+      "fdcId": 100001,
+      "description": "Lentils, mature seeds, cooked, boiled",
+      "dataType": "Foundation",
+      "foodNutrients": [
+        { "nutrientNumber": "203", "nutrientName": "Protein", "unitName": "G", "value": 9.02 },
+        { "nutrientNumber": "204", "nutrientName": "Total lipid (fat)", "unitName": "G", "value": 0.38 },
+        { "nutrientNumber": "205", "nutrientName": "Carbohydrate, by difference", "unitName": "G", "value": 20.1 },
+        { "nutrientNumber": "957", "nutrientName": "Energy (Atwater General Factors)", "unitName": "KCAL", "value": 116 }
+      ]
+    },
+    {
+      "fdcId": 100002,
+      "description": "FIXTURE PROTEIN BAR, CHOCOLATE",
+      "dataType": "Branded",
+      "brandOwner": "Fixture Snacks Inc.",
+      "brandName": "FIXTURE",
+      "gtinUpc": "012345678905",
+      "servingSize": 60,
+      "servingSizeUnit": "g",
+      "foodNutrients": [
+        { "nutrientId": 1008, "nutrientName": "Energy", "unitName": "KJ", "value": 1550 },
+        { "nutrientId": 1008, "nutrientName": "Energy", "unitName": "KCAL", "value": 370 },
+        { "nutrientId": 1003, "nutrientName": "Protein", "unitName": "G", "value": 33.3 },
+        { "nutrientId": 1004, "nutrientName": "Total lipid (fat)", "unitName": "G", "value": 11.7 },
+        { "nutrientId": 1005, "nutrientName": "Carbohydrate, by difference", "unitName": "G", "value": 38.3 }
+      ]
+    },
+    {
+      "fdcId": 100003,
+      "description": "Fixture food missing fat",
+      "dataType": "SR Legacy",
+      "foodNutrients": [
+        { "nutrientNumber": "208", "unitName": "KCAL", "value": 50 },
+        { "nutrientNumber": "203", "unitName": "G", "value": 1 },
+        { "nutrientNumber": "205", "unitName": "G", "value": 12 }
+      ]
+    }
+  ]
+}

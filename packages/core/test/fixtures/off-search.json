@@ -1,0 +1,26 @@
+{
+  "_fixture": "Hand-written in the shape of Open Food Facts GET /cgi/search.pl?search_terms=...&json=1. Invented test data. The second product has only kJ energy; the third has no nutriments and must be skipped.",
+  "count": 3,
+  "page": 1,
+  "page_size": 20,
+  "products": [
+    {
+      "code": "4000000000020",
+      "product_name": "Fixture skyr natural",
+      "brands": "Fixture Dairy",
+      "serving_quantity": 150,
+      "nutriments": { "energy-kcal_100g": 63, "proteins_100g": 11, "carbohydrates_100g": 4, "fat_100g": 0.2 }
+    },
+    {
+      "code": "036000000009",
+      "product_name": "Fixture oat drink",
+      "brands": "",
+      "nutriments": { "energy_100g": 197, "proteins_100g": 1, "carbohydrates_100g": 6.7, "fat_100g": 1.5 }
+    },
+    {
+      "code": "12345",
+      "product_name": "Fixture product with no nutrition data",
+      "nutriments": {}
+    }
+  ]
+}
