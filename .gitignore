@@ -10,3 +10,6 @@ ios/
 android/
 .vercel
 coverage/
+.next/
+next-env.d.ts.bak
+*.tsbuildinfo

@@ -62,9 +62,8 @@ export default function Logger() {
 
   const [selected, setSelected] = useState<SetKey | null>(null);
   const [justLogged, setJustLogged] = useState<SetKey | null>(null);
-  const [entry, setEntry] = useState<Entry | null>(null);
   const [swapFor, setSwapFor] = useState<ProgramExercise | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   const currentKey: SetKey | null = selected ?? next?.key ?? null;
   const current = useMemo(() => {
@@ -76,29 +75,34 @@ export default function Logger() {
 
   const suggestion = (e: ProgramExercise) => (session?.keptLoad[e.id] ? null : suggestionFor(e, completed));
 
-  // Prefill entry fields whenever the current set changes (UX C2: one tap when you did what was prescribed).
-  useEffect(() => {
-    if (!current) return setEntry(null);
+  // Entry fields start at the prescription (UX C2: one tap when you did what was prescribed),
+  // or at what was logged when editing. User edits are kept per set until it changes.
+  const defaults = useMemo<Entry | null>(() => {
+    if (!current) return null;
     const existing = logged.get(current.key);
     if (existing) {
-      setEntry({ weightKg: existing.weightKg, reps: existing.reps, rpe: existing.rpe, durationS: existing.durationS, distanceM: existing.distanceM });
-      return;
+      return { weightKg: existing.weightKg, reps: existing.reps, rpe: existing.rpe, durationS: existing.durationS, distanceM: existing.distanceM };
     }
     const e = current.exercise;
     const prev = previousSet(completed, e.id, current.setIndex);
     // After the first set, carry over what the client actually used on the previous set today.
-    const earlier = [...logged.values()].filter((s) => s.programExerciseId === e.id && s.setIndex < current.setIndex).sort((a, b) => b.setIndex - a.setIndex)[0];
-    const base = defaultEntry(e, current.setIndex, prev, suggestion(e)?.suggestedLoadKg ?? null);
+    const earlier = [...logged.values()]
+      .filter((s) => s.programExerciseId === e.id && s.setIndex < current.setIndex)
+      .sort((a, b) => b.setIndex - a.setIndex)[0];
+    const suggested = session?.keptLoad[e.id] ? null : suggestionFor(e, completed)?.suggestedLoadKg ?? null;
+    const base = defaultEntry(e, current.setIndex, prev, suggested);
     const p = e.sets.find((s) => s.index === current.setIndex);
-    setEntry({
+    return {
       weightKg: earlier?.weightKg ?? base.weightKg,
       reps: base.reps,
       rpe: null,
       durationS: e.metric === 'time' ? (p?.durationS ?? 30) : null,
       distanceM: e.metric === 'distance' ? (p?.distanceM ?? 20) : null,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.key, session?.keptLoad]);
+    };
+  }, [current, logged, completed, session?.keptLoad]);
+  const [edited, setEdited] = useState<{ key: SetKey; entry: Entry } | null>(null);
+  const entry = current && edited?.key === current.key ? edited.entry : defaults;
+  const setEntry = (e: Entry) => current && setEdited({ key: current.key, entry: e });
 
   // Rest timer tick (the end time is persisted, so it survives backgrounding and app kills).
   useEffect(() => {

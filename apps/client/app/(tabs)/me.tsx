@@ -5,6 +5,7 @@ import { DEMO_CLIENT } from '@spotter/core/demo';
 import { COACH_URL, IS_DEMO, tenant } from '../../src/env';
 import { setDemoOffline } from '../../src/sync';
 import { useApp, type TodayMode } from '../../src/store';
+import { MeRows } from '../../src/MeRows';
 
 /** C-10 Me. Demo builds add demo controls and "Switch to coach view". */
 export default function Me() {
@@ -51,6 +52,8 @@ export default function Me() {
           })
         }
       />
+
+      <MeRows />
 
       {IS_DEMO ? (
         <>

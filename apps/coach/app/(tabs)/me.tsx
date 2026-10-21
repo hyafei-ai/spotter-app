@@ -4,6 +4,7 @@ import { PARQ_QUESTIONS } from '@spotter/core';
 import { ListRow, Monogram, Screen, ScreenHeader, SectionLabel, Text, margin, space } from '@spotter/ui';
 import { CLIENT_URL, tenant } from '../../src/env';
 import { useIntakeEditor } from '../../src/intakeForm';
+import { MeRows } from '../../src/MeRows';
 
 export default function Me() {
   const saved = useIntakeEditor((s) => s.saved);
@@ -21,6 +22,7 @@ export default function Me() {
         last
         onPress={() => router.push('/intake-form')}
       />
+      <MeRows />
       <SectionLabel>Demo</SectionLabel>
       <ListRow title="Switch to client view" chevron last onPress={() => void Linking.openURL(CLIENT_URL)} />
       <Text variant="caption" color="ink2" style={{ padding: margin, paddingTop: space[3] }}>

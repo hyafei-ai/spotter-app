@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import { PanResponder, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { useRef, useState } from 'react';
+import { Pressable, StyleSheet, View, type GestureResponderEvent, type LayoutChangeEvent, type ViewProps } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Text, useTheme, radius, space } from '@spotter/ui';
 
@@ -7,8 +7,8 @@ import { Text, useTheme, radius, space } from '@spotter/ui';
 export function SignaturePad({ onChange }: { onChange: (svg: string | null) => void }) {
   const { colors } = useTheme();
   const [strokes, setStrokes] = useState<string[]>([]);
-  const current = useRef<string>('');
-  const [, force] = useState(0);
+  const [current, setCurrent] = useState('');
+  const currentRef = useRef('');
   const size = useRef({ w: 300, h: 160 });
 
   const emit = (all: string[]) => {
@@ -22,35 +22,31 @@ export function SignaturePad({ onChange }: { onChange: (svg: string | null) => v
     );
   };
 
-  const responder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderGrant: (e) => {
-          const { locationX: x, locationY: y } = e.nativeEvent;
-          current.current = `M${x.toFixed(1)} ${y.toFixed(1)}`;
-          force((n) => n + 1);
-        },
-        onPanResponderMove: (e) => {
-          const { locationX: x, locationY: y } = e.nativeEvent;
-          current.current += ` L${x.toFixed(1)} ${y.toFixed(1)}`;
-          force((n) => n + 1);
-        },
-        onPanResponderRelease: () => {
-          const d = current.current;
-          current.current = '';
-          setStrokes((prev) => {
-            const next = d.includes('L') ? [...prev, d] : prev;
-            emit(next);
-            return next;
-          });
-        },
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+  // Plain responder props (rather than PanResponder) so the handlers can read current state directly.
+  const responder: Partial<ViewProps> = {
+    onStartShouldSetResponder: () => true,
+    onMoveShouldSetResponder: () => true,
+    onResponderTerminationRequest: () => false,
+    onResponderGrant: (e: GestureResponderEvent) => {
+      const { locationX: x, locationY: y } = e.nativeEvent;
+      currentRef.current = `M${x.toFixed(1)} ${y.toFixed(1)}`;
+      setCurrent(currentRef.current);
+    },
+    onResponderMove: (e: GestureResponderEvent) => {
+      const { locationX: x, locationY: y } = e.nativeEvent;
+      currentRef.current += ` L${x.toFixed(1)} ${y.toFixed(1)}`;
+      setCurrent(currentRef.current);
+    },
+    onResponderRelease: () => {
+      const d = currentRef.current;
+      currentRef.current = '';
+      setCurrent('');
+      if (!d.includes('L')) return;
+      const next = [...strokes, d];
+      setStrokes(next);
+      emit(next);
+    },
+  };
 
   const clear = () => {
     setStrokes([]);
@@ -72,7 +68,7 @@ export function SignaturePad({ onChange }: { onChange: (svg: string | null) => v
         ) : null}
       </View>
       <View
-        {...responder.panHandlers}
+        {...responder}
         onLayout={(e: LayoutChangeEvent) => {
           size.current = { w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height };
         }}
@@ -81,7 +77,7 @@ export function SignaturePad({ onChange }: { onChange: (svg: string | null) => v
         style={[styles.pad, { borderColor: colors.line, backgroundColor: colors.surface }]}
       >
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-          {[...strokes, current.current].filter(Boolean).map((d, i) => (
+          {[...strokes, current].filter(Boolean).map((d, i) => (
             <Path key={i} d={d} stroke={colors.ink} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
           ))}
         </Svg>

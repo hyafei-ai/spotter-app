@@ -1,7 +1,6 @@
 import { Text as RNText, useWindowDimensions, type TextProps as RNTextProps, type TextStyle } from 'react-native';
 import { useTheme } from '../theme';
-import { type, type TypeVariant } from '../tokens';
-import type { ColorName } from '../tokens';
+import { type, type ColorName, type TypeVariant } from '../tokens';
 
 export interface TextProps extends RNTextProps {
   variant?: TypeVariant;

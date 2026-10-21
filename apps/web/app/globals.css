@@ -1,0 +1,30 @@
+/* Same tokens as packages/ui/src/tokens.ts. The tenant accent is set per page via --brand. */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&display=swap');
+
+:root {
+  --paper: #f3efe7; --surface: #fbf9f4; --ink: #1c1b18; --ink2: #5d5a52; --line: #ddd6c8;
+  --brand: #c2410c; --brand-ink: #ffffff; --success: #2f6b3f; --warning: #9a6a00; --error: #b3261e;
+  --display: 'Barlow Condensed', system-ui, sans-serif; --text: 'Source Sans 3', system-ui, sans-serif;
+  --r: 6px; --r-sheet: 10px; --margin: 20px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --paper: #171614; --surface: #211f1c; --ink: #f1ece2; --ink2: #a8a296; --line: #34312c; --brand: #f07a3e; --brand-ink: #1c1b18; --success: #6fbf83; --warning: #e0b04a; --error: #f2867e; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.4 var(--text); }
+a { color: inherit; }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; margin: 0; }
+h1 { font-size: 40px; line-height: 1.05; font-weight: 700; }
+h2 { font-size: 28px; line-height: 1.15; }
+.label { font: 600 12px/16px var(--text); letter-spacing: 0.6px; text-transform: uppercase; color: var(--ink2); }
+.muted { color: var(--ink2); }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px 20px; border-radius: var(--r); border: 0; font: 600 16px var(--text); cursor: pointer; text-decoration: none; }
+.btn-primary { background: var(--brand); color: var(--brand-ink); }
+.btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.field { display: grid; gap: 4px; }
+.field input, .field textarea, .field select { min-height: 48px; padding: 10px 12px; border-radius: var(--r); border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 400 16px var(--text); }
+.row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); min-height: 56px; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 var(--margin); }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

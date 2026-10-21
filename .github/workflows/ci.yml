@@ -16,6 +16,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm --filter @spotter/web build
       - run: pnpm --filter @spotter/core test
       - run: node packages/db/scripts/sync-schemas.mjs --check
       - name: SQL migrations + RLS tests (local Postgres)

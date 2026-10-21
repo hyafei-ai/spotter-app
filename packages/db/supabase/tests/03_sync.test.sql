@@ -96,3 +96,15 @@ select public.sync_apply($j$[
 ]$j$::jsonb);
 reset role;
 select pg_temp.check(exists (select 1 from triage_items where reason_code = 'parq_flag' and client_id = 'a0000000-0000-7000-8000-0000000000c1'), 'PAR-Q yes flags the client for the coach');
+
+-- Feature areas can register handlers for new kinds via sync_handle_<area>.
+create function public.sync_handle_zz_test(kind text, p jsonb, uid uuid, mid uuid, client_ip inet) returns uuid
+language plpgsql as $$ begin
+  if kind <> 'test.echo' then return null; end if;
+  return 'a0000000-0000-7000-8000-000000000000';
+end $$;
+select set_config('request.jwt.claim.sub', 'a0000000-0000-7000-8000-0000000000c1', false);
+set role authenticated;
+select pg_temp.check((public.sync_apply($j$[{"clientMutationId":"01900000-0000-7000-8000-000000000061","createdAt":"2026-10-21T10:00:00Z","kind":"test.echo","payload":{}}]$j$::jsonb) -> 'accepted') ? '01900000-0000-7000-8000-000000000061', 'new mutation kinds dispatch to a registered handler');
+reset role;
+drop function public.sync_handle_zz_test(text, jsonb, uuid, uuid, inet);

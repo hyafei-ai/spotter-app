@@ -5,6 +5,7 @@ import { DEMO_HISTORY, DEMO_CLIENTS } from '@spotter/core/demo';
 import { Button, EmptyState, IconButton, ListRow, Monogram, Screen, SectionLabel, Tag, Text, TextField, useTheme, useToast, margin, space } from '@spotter/ui';
 import { tenant } from '../../../src/env';
 import { initials, useCoach } from '../../../src/store';
+import { ClientSections } from '../../../src/ClientSections';
 
 /** K-3 client detail. */
 export default function ClientDetail() {
@@ -119,6 +120,8 @@ export default function ClientDetail() {
           No sessions logged yet.
         </Text>
       )}
+
+      <ClientSections clientId={c.id} />
 
       <SectionLabel>Private notes</SectionLabel>
       <View style={styles.body}>

@@ -6,6 +6,7 @@ import { SyncBanner } from '../../src/SyncBanner';
 import { tenant } from '../../src/env';
 import { longDate, prescriptionLine } from '../../src/format';
 import { isFinishedToday, suggestionFor, todayPlan, useApp } from '../../src/store';
+import { DueItems } from '../../src/DueItems';
 
 /** C-3 Today. Header is the session name, never a greeting. One primary action. */
 export default function Today() {
@@ -78,6 +79,7 @@ export default function Today() {
         {/* MOCK DATA: rest-day tasks come from the coach's program. */}
         <ListRow title="20-minute walk" subtitle="Any pace" />
         <ListRow title="Hip and ankle mobility" subtitle="10 minutes" last />
+        <DueItems />
       </Screen>
     );
   }
@@ -97,6 +99,7 @@ export default function Today() {
             {done.sets.length} sets logged. {first} will see them once they sync.
           </Text>
         </View>
+        <DueItems />
       </Screen>
     );
   }
@@ -128,6 +131,7 @@ export default function Today() {
           />
         );
       })}
+      <DueItems />
     </Screen>
   );
 }
