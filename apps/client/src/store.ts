@@ -28,10 +28,12 @@ export interface ActiveSession {
   swaps: Record<string, { exerciseId: string; name: string }>;
   /** programExerciseId → client chose "Keep current load" over the suggestion */
   keptLoad: Record<string, boolean>;
+  /** Which version the client chose from Today's read. Absent means as planned. */
+  variant?: 'planned' | 'lighter' | 'recovery';
 }
 
 /** `plan` is what was prescribed that day, kept so History can show targets after the program changes. */
-export type CompletedSession = PastSession & { note: string | null; plan?: SessionPlan };
+export type CompletedSession = PastSession & { note: string | null; plan?: SessionPlan; variant?: 'planned' | 'lighter' | 'recovery' };
 
 export interface ChatMessage {
   id: string;
@@ -62,7 +64,7 @@ interface AppState {
   submitIntake(form: { id: string; version: number }, answers: Record<string, unknown>, parqFlag: boolean): Promise<void>;
   signWaiver(signedName: string, signatureSvg: string): Promise<void>;
   setNotificationsAsked(): void;
-  startSession(plan: SessionPlan): Promise<string>;
+  startSession(plan: SessionPlan, variant?: 'planned' | 'lighter' | 'recovery'): Promise<string>;
   logSet(entry: Omit<LoggedSet, 'id' | 'sessionId' | 'loggedAt'>): Promise<LoggedSet>;
   undoSet(programExerciseId: string, setIndex: number): Promise<void>;
   setRest(endsAt: number | null, notificationId: string | null): void;
@@ -120,7 +122,7 @@ export const useApp = create<AppState>()(
 
       setNotificationsAsked: () => set({ notificationsAsked: true }),
 
-      async startSession(plan) {
+      async startSession(plan, variant) {
         const existing = get().active;
         if (existing && existing.plan.programDayId === plan.programDayId) return existing.sessionId;
         const sessionId = uuidv7();
@@ -131,7 +133,7 @@ export const useApp = create<AppState>()(
           scheduledDate: plan.scheduledDate,
           startedAt,
         });
-        set({ active: { sessionId, plan, startedAt, sets: [], restEndsAt: null, restNotificationId: null, swaps: {}, keptLoad: {} } });
+        set({ active: { sessionId, plan, startedAt, sets: [], restEndsAt: null, restNotificationId: null, swaps: {}, keptLoad: {}, ...(variant && variant !== 'planned' ? { variant } : {}) } });
         return sessionId;
       },
 
@@ -196,6 +198,7 @@ export const useApp = create<AppState>()(
           note,
           sets: [...active.sets].sort((a, b) => a.loggedAt.localeCompare(b.loggedAt)),
           plan: active.plan,
+          ...(active.variant ? { variant: active.variant } : {}),
         };
         set({ active: null, completed: [...get().completed, done] });
         return done;
@@ -272,5 +275,6 @@ export function previousSet(completed: CompletedSession[], exerciseId: string, s
 
 export function isFinishedToday(completed: CompletedSession[], plan: SessionPlan | null): CompletedSession | undefined {
   if (!plan) return undefined;
-  return completed.find((s) => s.date === plan.scheduledDate && s.title === plan.title);
+  // A lighter or recovery version done instead of today's plan also counts as today's session.
+  return completed.find((s) => s.date === plan.scheduledDate && (s.title === plan.title || (!!s.variant && s.variant !== 'planned')));
 }

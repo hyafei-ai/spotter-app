@@ -82,7 +82,7 @@ export default function Logger() {
   }, [session, currentKey]);
 
   const suggestion = (e: ProgramExercise) =>
-    session?.keptLoad[e.id] ? null : suggestionFor(e, completed);
+    session?.keptLoad[e.id] || session?.variant ? null : suggestionFor(e, completed);
 
   // Entry fields start at the prescription (UX C2: one tap when you did what was prescribed),
   // or at what was logged when editing. User edits are kept per set until it changes.
@@ -104,7 +104,8 @@ export default function Logger() {
     const earlier = [...logged.values()]
       .filter((s) => s.programExerciseId === e.id && s.setIndex < current.setIndex)
       .sort((a, b) => b.setIndex - a.setIndex)[0];
-    const suggested = session?.keptLoad[e.id]
+    // No load jumps on the easier or recovery version the client chose from the read.
+    const suggested = session?.keptLoad[e.id] || session?.variant
       ? null
       : (suggestionFor(e, completed)?.suggestedLoadKg ?? null);
     const base = defaultEntry(e, current.setIndex, prev, suggested);
