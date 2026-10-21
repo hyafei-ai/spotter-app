@@ -19,3 +19,4 @@ export * from './branding';
 export * from './platform';
 export * from './qr';
 export * from './pull';
+export * from './signals';
