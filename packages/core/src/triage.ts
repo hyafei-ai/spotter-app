@@ -10,6 +10,7 @@ export const TRIAGE_PRIORITY: Record<TriageReason, number> = {
   missed_sessions: 50,
   churn_risk: 40,
   new_client: 30,
+  check_in_request: 75,
 };
 
 export interface TriageItem {
@@ -21,6 +22,8 @@ export interface TriageItem {
   since: string;
   snoozedUntil: string | null;
   handledAt: string | null;
+  /** Ready-made line, e.g. "Maya asked you to check in: no session in 12 days". */
+  detail?: string;
 }
 
 const DAY = 86_400_000;
@@ -49,6 +52,8 @@ export function reasonText(item: TriageItem, now: number = Date.now()): string {
       return 'Hasn’t opened the app in 7 days';
     case 'new_client':
       return 'New client';
+    case 'check_in_request':
+      return item.detail ?? 'Asked you to check in';
   }
 }
 

@@ -243,6 +243,8 @@ export const TriageReason = z.enum([
   'missed_sessions',
   'churn_risk',
   'new_client',
+  // Owner asked a coach to check in on a member (docs/features/retention.md).
+  'check_in_request',
 ]);
 export type TriageReason = z.infer<typeof TriageReason>;
 
