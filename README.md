@@ -23,7 +23,8 @@ pnpm client            # Expo dev server for the client app (TENANT_ID=north-sho
 pnpm coach             # coach app
 pnpm test              # core unit tests (Vitest) + SQL migrations/RLS tests on a throwaway local Postgres
 pnpm typecheck
-bash scripts/build-web.sh   # web preview: client at /, coach at /coach-app (what Vercel deploys)
+bash scripts/build-web.sh   # Expo web preview: client at /, coach at /coach-app, shared app at /shared
+pnpm web                    # Next.js trainer pages + coach dashboard on :3001
 ```
 
 Without `EXPO_PUBLIC_SUPABASE_URL` the apps run in demo mode: sample data, a demo sync transport, and **Me → Demo controls** to show the screen states (offline, rest day, no program, payment problem).
@@ -32,12 +33,23 @@ Without `EXPO_PUBLIC_SUPABASE_URL` the apps run in demo mode: sample data, a dem
 
 ## What's built (against the build plan)
 
-| Phase | Status |
-|---|---|
-| 1 Foundation | Monorepo, both apps on Expo Router, tokens + components, fonts, light/dark, tenant switching via `TENANT_ID`, brand AA check, schema + RLS with SQL tests. **Not yet:** Supabase Auth wiring (magic link / Apple / Google), ESLint config. |
-| 2 Client core loop | Welcome (incl. expired invite), intake rendered from the trainer's own form (PAR-Q block always appended) with resume-later draft, waiver with drawn signature (works offline), notification ask, Today (session / rest / no program / done / resume / skeleton), logger (prefilled one-tap logging, chalk strike + haptic, Undo, edit a logged set, rest timer with local notification, supersets, distance/time/bodyweight, swap to approved alternative, smart-progression suggestion with "Keep"), finish (real PRs only, unlogged-set warning), History + read-only log. Persistent SQLite queue with backoff, idempotency, reject handling and a sync banner. **Not yet:** exercise demo video, AMRAP-specific UI, Maestro E2E. |
-| 3 Coach core loop | Intake form editor (add, edit, reorder and delete questions of six types; preview; PAR-Q locked), triage list with reasons, filters, search, actions sheet (Reply, Mark handled with Undo, Snooze), client detail, read-only program view, thread. **Not yet:** program builder/assignment, realtime, push, swipe gestures (the action sheet is the button alternative). |
-| 4–9 | Not started: form checks/video, check-ins, AI drafts (table + approval constraint exist), nutrition, payments/Grow, publishing pipeline, team, import/export. |
+Every phase of the build plan has a working implementation. Each one runs fully in demo mode (sample data, no server) and is wired to Supabase, Stripe, Mux and the AI API for when credentials are set. Per-area detail, including exactly what is mocked and which credentials each part needs, is in `docs/features/`.
+
+| Phase | What's in place | Details |
+|---|---|---|
+| 1 Foundation | Monorepo, both apps, design system, light/dark, per-tenant config, RLS on every table, ESLint, CI | this README |
+| 2 Client core loop | Invite/consent/intake (coach-editable)/waiver, Today, offline logger with the chalk strike, finish, history, sync queue | `docs/design/` |
+| 3 Coach core loop | Triage (live, swipe + buttons), client detail, program builder and assignment, exercise library, messaging with voice/photos, push | `programs.md`, `platform.md` |
+| 4 Form checks and check-ins | Record/pick video, resumable upload, coach review with drawing tools, voice-over and compare; weekly check-ins with photos | `formchecks-checkins.md` |
+| 5 AI and progression | Check-in summaries, program drafts and churn flags, all coach-approved and logged; server-side progression | `ai.md` |
+| 6 Nutrition | Macros or portions or off, food search, barcode scan, meal plans, habits, Apple Health / Health Connect | `nutrition.md` |
+| 7 Payments and Grow | Stripe Connect, plans, coupons, trials, session packs, landing pages, storefront, leads, referrals, real-data stats | `grow.md` |
+| 8 White-label publishing | Brand setup with preview, per-tenant EAS builds, encrypted store credentials, publishing checklist and status, shared app with trainer code | `publishing.md` |
+| 9 Team, portability, hardening | Assistants and hand-offs, CSV import, export and account deletion, support access audit, Sentry/PostHog, Maestro flows, accessibility pass | `platform.md` |
+
+**Not verified here** (no credentials or devices in the build environment): real calls to Supabase, Stripe, Mux, the AI API, Expo push and email; native-only features (HealthKit, Health Connect, background upload, camera recording); Maestro flows on a simulator; App Store / Play submission. These need a configured environment and a device build.
+
+**Web apps.** The Expo web preview (client at `/`, coach at `/coach-app`, shared app at `/shared`) deploys from `vercel.json`. The trainer pages and coach dashboard in `apps/web` (Next.js) deploy as a separate Vercel project with root `apps/web` (see `docs/features/grow.md`).
 
 ## Backend
 
