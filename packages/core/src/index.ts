@@ -16,3 +16,6 @@ export * from './ai';
 export * from './nutrition';
 export * from './grow';
 export * from './branding';
+export * from './platform';
+export * from './qr';
+export * from './pull';

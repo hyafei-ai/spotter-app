@@ -185,6 +185,38 @@ export const Mutation = z.discriminatedUnion('kind', [
     kind: z.literal('habit.check'),
     payload: z.object({ habitId: z.string().min(1).max(80), date: isoDate, done: z.boolean(), checkedAt: isoDateTime }),
   }),
+  // Platform (C-6 attachments and read receipts, consent at signup).
+  z.object({
+    ...base,
+    kind: z.literal('message.attach'),
+    payload: z.object({
+      messageId: uuid,
+      threadId: uuid,
+      kind: z.enum(['voice', 'image', 'link']),
+      body: z.string().max(4000).nullable(),
+      /** Storage path after upload; the local file URI stays on device until then. */
+      mediaPath: z.string().max(500).nullable(),
+      durationMs: z.number().int().min(0).nullable(),
+      link: z.object({ type: z.enum(['session', 'form_check', 'program']), id: uuid, title: z.string().max(120) }).nullable(),
+      sentAt: isoDateTime,
+    }),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal('message.read'),
+    payload: z.object({ threadId: uuid, upTo: isoDateTime }),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal('consent.record'),
+    payload: z.object({
+      consentId: uuid,
+      kind: z.enum(['terms_privacy', 'marketing', 'health_data']),
+      granted: z.boolean(),
+      version: z.string().min(1).max(40),
+      recordedAt: isoDateTime,
+    }),
+  }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];

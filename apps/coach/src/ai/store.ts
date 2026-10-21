@@ -15,6 +15,7 @@ import {
 import { demoLibrary, demoProgramSource, demoSummarySource } from './demoSource';
 import { usePrograms } from '../programs';
 import { useMedia } from '../media/store';
+import { useInbox } from '../platform/inbox';
 
 /**
  * Coach-side AI drafts (K-2). Every output is a draft until the coach taps Approve and send.
@@ -233,7 +234,10 @@ export const useAi = create<AiState>((set, get) => {
           });
           if (!res.ok) throw new Error('Couldn’t send it. Your draft is still here; try again.');
         } else {
+          // MOCK: the demo appends to the coach's thread locally. Live builds get the message the
+          // server's approve_ai_draft inserted, through the thread's realtime channel.
           await delay(400);
+          await useInbox.getState().send(clientId, { kind: 'text', body: s.text.trim(), mediaUri: null, durationMs: null });
         }
         const at = new Date().toISOString();
         set({ sent: [...get().sent, { id: uuidv7(), clientId, body: s.text.trim(), at }] });

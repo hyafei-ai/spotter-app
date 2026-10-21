@@ -24,3 +24,5 @@ jobs:
         run: pnpm --filter @spotter/db test
       - name: Web export (both apps)
         run: bash scripts/build-web.sh
+      - name: Maestro flows parse (they run on a simulator, not in CI)
+        run: node scripts/check-maestro.mjs

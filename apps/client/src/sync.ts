@@ -2,18 +2,22 @@ import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { create } from 'zustand';
 import { SyncPushResponse, SyncQueue, type Mutation, type SyncStatus, type SyncTransport } from '@spotter/core';
+import { accessToken } from '@spotter/ui/platform';
 import { queueStore } from './storage';
 import { recordAppOpen } from './appOpen';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 
-/** Real transport: POST /sync/push on the Supabase Edge Function. */
+/** Real transport: POST /sync/push on the Supabase Edge Function, as the signed-in user. */
 class EdgeFunctionTransport implements SyncTransport {
-  constructor(private url: string, private getToken: () => string | null) {}
+  constructor(private url: string, private getToken: () => Promise<string | null>) {}
   async push(mutations: Mutation[]) {
+    const token = await this.getToken();
+    // Signed out or session expired: keep everything queued until the person signs in again.
+    if (!token) throw new Error('Sign in again to sync.');
     const res = await fetch(`${this.url}/functions/v1/sync-push`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${this.getToken() ?? ''}` },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
       body: JSON.stringify({ mutations }),
     });
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
@@ -36,7 +40,7 @@ class DemoTransport implements SyncTransport {
 
 export const syncQueue = new SyncQueue(
   queueStore,
-  SUPABASE_URL ? new EdgeFunctionTransport(SUPABASE_URL, () => null) : new DemoTransport(),
+  SUPABASE_URL ? new EdgeFunctionTransport(SUPABASE_URL, accessToken) : new DemoTransport(),
 );
 
 interface SyncState {

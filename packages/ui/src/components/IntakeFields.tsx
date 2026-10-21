@@ -143,7 +143,8 @@ function ChoiceList({
           <Pressable
             key={o}
             accessibilityRole={multiple ? 'checkbox' : 'radio'}
-            accessibilityState={multiple ? { checked: on } : { selected: on }}
+            accessibilityState={multiple ? { checked: on } : { selected: on, checked: on }}
+            aria-checked={on}
             accessibilityLabel={o}
             onPress={() => {
               haptic.selection();

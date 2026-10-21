@@ -86,7 +86,11 @@ export function Monogram({ initials, size = 48, imageUrl, label }: { initials: s
   return (
     <View
       accessibilityLabel={label}
-      accessibilityRole="image"
+      accessibilityRole={label ? 'image' : undefined}
+      // Without a label the monogram is decorative: the row around it already names the person.
+      accessibilityElementsHidden={!label}
+      importantForAccessibility={label ? 'auto' : 'no-hide-descendants'}
+      aria-hidden={!label}
       style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
     >
       <Text
@@ -189,7 +193,8 @@ export function SegmentedControl<T extends string>({
           <Pressable
             key={o.value}
             accessibilityRole="radio"
-            accessibilityState={{ selected }}
+            accessibilityState={{ selected, checked: selected }}
+            aria-checked={selected}
             accessibilityLabel={o.label}
             onPress={() => {
               haptic.selection();

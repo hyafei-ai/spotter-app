@@ -1,6 +1,7 @@
 import { HealthRow } from './health/HealthRow';
 import { PlanRow, ReferralRow } from './billing/BillingRows';
 import { SharedTrainerRow } from './SharedTrainerRow';
+import { AccountRows } from './platform/AccountRows';
 
 /**
  * Extra rows on the client's Me tab (C-10): health app, billing, export, delete, etc.
@@ -12,6 +13,7 @@ const ME_ROWS: React.ComponentType[] = [
   PlanRow,
   ReferralRow,
   SharedTrainerRow,
+  AccountRows, // keep last: notifications, export, delete account, sign out
 ];
 
 export function MeRows() {

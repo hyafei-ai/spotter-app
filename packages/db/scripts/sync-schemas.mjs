@@ -1,5 +1,5 @@
 // Copies shared core code into the Edge Functions folder (Supabase bundles only supabase/functions).
-// Run after editing packages/core/src/{schemas,progression,ai,nutrition}.ts: pnpm --filter @spotter/db sync-schemas
+// Run after editing packages/core/src/{schemas,progression,ai,nutrition,platform}.ts: pnpm --filter @spotter/db sync-schemas
 //   _shared/schemas.ts      — the Zod schemas (used by sync-push)
 //   _shared/core/*.ts       — modules the AI and progression functions import; relative imports get
 //                             a .ts extension because Deno requires one.
@@ -15,6 +15,8 @@ const outputs = [
   { out: fn('schemas.ts'), body: header('schemas.ts') + readFileSync(core('schemas.ts'), 'utf8') },
   // nutrition.ts imports only zod, so it is copied as-is for food-search and the nutrition handlers.
   { out: fn('nutrition.ts'), body: header('nutrition.ts') + readFileSync(core('nutrition.ts'), 'utf8') },
+  // platform.ts (invites, sync pull, push, consent) imports only zod.
+  { out: fn('platform.ts'), body: header('platform.ts') + readFileSync(core('platform.ts'), 'utf8') },
   ...['schemas.ts', 'progression.ts', 'ai.ts'].map((f) => ({
     out: fn(`core/${f}`),
     body: header(f) + withExt(readFileSync(core(f), 'utf8')),
