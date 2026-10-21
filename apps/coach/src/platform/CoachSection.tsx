@@ -4,6 +4,8 @@ import { Feather } from '@expo/vector-icons';
 import { Button, ListRow, SectionLabel, Sheet, Text, TextField, useTheme, useToast, margin, space } from '@spotter/ui';
 import { useRole, useTeam } from './team';
 
+const NO_HISTORY: never[] = [];
+
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
 /** Client detail: who coaches this client, their history, and (owner) handing them to another coach (K-8). */
@@ -13,7 +15,7 @@ export function CoachSection({ clientId }: { clientId: string }) {
   const { isOwner } = useRole();
   const coaches = useTeam((s) => s.coaches);
   const coachOf = useTeam((s) => s.coachOf);
-  const history = useTeam((s) => s.history[clientId] ?? []);
+  const history = useTeam((s) => s.history[clientId]) ?? NO_HISTORY;
   const handOff = useTeam((s) => s.handOff);
   const [open, setOpen] = useState(false);
   const [to, setTo] = useState<string | null>(null);

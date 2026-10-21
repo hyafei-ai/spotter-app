@@ -8,6 +8,9 @@ import { tenant } from '../../../src/env';
 import { useCoach } from '../../../src/store';
 import { useInbox, type CoachMessage } from '../../../src/platform/inbox';
 
+// Stable empty list: a fresh [] from the selector would re-render forever (React #185).
+const NO_MESSAGES: CoachMessage[] = [];
+
 /**
  * Coach side of a client thread (C-6, K-1): text, voice notes, photos and saved replies,
  * with read receipts and a typing indicator over realtime in connected builds.
@@ -18,7 +21,7 @@ export default function Thread() {
   const toast = useToast();
   const auth = useAuth();
   const c = useCoach((s) => s.clients.find((x) => x.id === id));
-  const msgs = useInbox((s) => s.threads[id ?? ''] ?? []);
+  const msgs = useInbox((s) => s.threads[id ?? ''] ?? NO_MESSAGES);
   const send = useInbox((s) => s.send);
   const replies = useInbox((s) => s.savedReplies);
   const [draft, setDraft] = useState('');

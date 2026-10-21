@@ -29,6 +29,7 @@ import {
   space,
 } from '@spotter/ui';
 import { tenant } from '../../src/env';
+import { isConfigured } from '@spotter/ui/platform';
 import { WEB_URL, pageUrl, useGrowStore } from '../../src/grow';
 
 const STATUS_TONE: Record<LeadStatus, 'brand' | 'neutral' | 'success' | 'warning'> = {
@@ -136,6 +137,11 @@ export default function Grow() {
       )}
 
       <SectionLabel>Business</SectionLabel>
+      {!isConfigured() && subs.length > 0 ? (
+        <Text variant="caption" color="ink2" style={styles.body}>
+          Sample subscriptions in this demo. Connected to Stripe, these come from your real payments only.
+        </Text>
+      ) : null}
       {subs.length === 0 ? (
         <Text color="ink2" style={styles.body}>
           No paying clients yet. Numbers appear once clients sign up.
