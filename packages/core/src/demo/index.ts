@@ -12,3 +12,4 @@ export * from './brief';
 export * from './atrisk';
 export * from './fuel';
 export * from './cycle';
+export * from './patterns';

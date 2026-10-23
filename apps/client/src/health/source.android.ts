@@ -58,6 +58,7 @@ const ACTIVITY: Record<number, ImportedActivity> = {
   [ExerciseType.HIGH_INTENSITY_INTERVAL_TRAINING]: 'hiit',
   [ExerciseType.YOGA]: 'yoga',
   [ExerciseType.PILATES]: 'pilates',
+  [ExerciseType.STRETCHING]: 'flexibility',
   [ExerciseType.DANCING]: 'dance',
   [ExerciseType.EXERCISE_CLASS]: 'class',
   [ExerciseType.BOOT_CAMP]: 'class',
