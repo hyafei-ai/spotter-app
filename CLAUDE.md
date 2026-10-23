@@ -32,6 +32,11 @@ The product owner's previous app is a source of proven logic, not of UX. Port lo
 (or re-implement the idea in Spotter's architecture); never copy its screens or navigation. Record what was taken and
 why in `docs/ports.md`. Every ported feature still goes through the UX gate above. Never commit to that repo.
 
+## White label, everywhere
+Each trainer's clients see only the trainer's brand: app name, icon, colours, coach name. That includes the watch app,
+its complications, notifications, health-permission prompts and share cards. No "Spotter" (or Station Zero) on any
+client-facing surface. The coach app may say Spotter.
+
 ## Product rules
 - Plain English. Explain, don't score. Screening, never diagnosis. No invented statistics.
 - Health data (cycle, symptoms, fuelling, pain) is the client's; their coach sees it only when shared.
