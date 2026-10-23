@@ -3,10 +3,11 @@ import { AiMeRow } from './ai/AiMeRow';
 import { PublishMeRows } from './PublishMeRows';
 import { PlatformRows } from './platform/PlatformRows';
 import { useRole } from './platform/team';
-import { MembersMeRow } from './retention/MembersMeRow';
-import { RetentionMeRow } from './atrisk/RetentionMeRow';
 
-/** Brand and publishing are owner-only; assistants don't see them (UX finding M1, K-8). */
+/**
+ * Rows only the coach who owns the business sees (the tenant "owner" role): brand, publishing and the
+ * business view. Assistant coaches in a team don't see them, so they never see money (UX finding M1, K-8).
+ */
 function OwnerOnly({ children }: { children: React.ReactNode }) {
   const { isOwner } = useRole();
   return isOwner ? <>{children}</> : null;
@@ -18,29 +19,15 @@ const PublishForOwner = () => (
   </OwnerOnly>
 );
 
-const MembersForOwner = () => (
-  <OwnerOnly>
-    <MembersMeRow />
-  </OwnerOnly>
-);
-
-const RetentionForOwner = () => (
-  <OwnerOnly>
-    <RetentionMeRow />
-  </OwnerOnly>
-);
-
 /**
  * Extra rows on the coach's Me tab: check-ins, AI usage, brand and publishing, team and data.
- * Owner-only rows (billing, branding, publishing) go through OwnerOnly.
+ * Business-owner rows (billing, branding, publishing, keeping clients) go through OwnerOnly.
  */
 const ME_ROWS: React.ComponentType[] = [
   CheckInTemplateRow,
   AiMeRow,
   PublishForOwner,
-  MembersForOwner,
-  RetentionForOwner,
-  PlatformRows, // keep last: team, import/export, notifications, saved replies, sign out
+  PlatformRows, // keep last: your business (keeping clients, team, import/export), notifications, saved replies, sign out
 ];
 
 export function MeRows() {

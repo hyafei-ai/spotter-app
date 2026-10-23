@@ -5,14 +5,12 @@ import {
   checkInRequestText,
   keptSummary,
   memberStatus,
-  membersToTalkTo,
   monthlyRevenueCents,
   type Intervention,
   type InterventionAction,
   type KeptSummary,
   type MemberActivity,
   type MemberRiskInputRow,
-  type MembersToTalkTo,
   type MemberStatus,
   type TriageItem,
 } from '@spotter/core';
@@ -24,11 +22,14 @@ import { useTeam } from '../platform/team';
 import { loadCoachData } from '../platform/serverData';
 
 /*
- * Owner job: members to talk to, asking a coach to check in, and who stayed (docs/features/retention.md).
- * MOCK DATA in the demo: member activity and earlier check-ins from @spotter/core/demo, run through the
+ * Check-ins and who stayed after one (docs/features/retention.md). The coach logs a check-in from
+ * client detail ("I checked in": message, call, session, other); the business view (Me → Your
+ * business → Keeping clients, owner role only) shows who stayed 60 days later. In a team, the head
+ * coach can also ask an assistant to check in on one of the assistant's clients (handToCoach).
+ * MOCK DATA in the demo: client activity and earlier check-ins from @spotter/core/demo, run through the
  * same functions as live data. Check-ins made in the demo are kept in localStorage
- * (spotter.retention.<slug>). Connected builds call members_at_risk, kept_summary, hand_to_coach and
- * complete_check_in.
+ * (spotter.retention.<slug>). Connected builds call members_at_risk and kept_summary (owner role),
+ * log_check_in, hand_to_coach and complete_check_in.
  */
 
 const KEY = `spotter.retention.${tenant.slug}`;
@@ -51,7 +52,7 @@ function save(list: Intervention[]) {
   }
 }
 
-/** Open requests become coach triage items: "{Owner} asked you to check in: {reason}". */
+/** Teams: open requests become the assistant's triage items: "{Head coach} asked you to check in: {reason}". */
 function requestItem(i: Intervention, ownerFirst: string): TriageItem {
   return {
     id: `req-${i.id}`,
@@ -88,8 +89,20 @@ interface RetentionState {
   /** When the list was last loaded (shown when offline). */
   loadedAt: string | null;
   load(): Promise<void>;
-  handToCoach(member: { clientId: string; name: string; monthlyCents: number }, coachId: string, reason: string, note: string | null): Promise<void>;
+  /** Teams only: the head coach asks another coach to check in. */
+  handToCoach(client: { clientId: string; name: string; monthlyCents: number }, coachId: string, reason: string, note: string | null): Promise<void>;
   completeCheckIn(interventionId: string, action: InterventionAction, note: string | null): Promise<void>;
+  /**
+   * "I checked in" from client detail: records a done check-in by the viewer, closing any open request
+   * for that client first. Feeds "kept after a check-in" on the business view.
+   */
+  logCheckIn(
+    client: { clientId: string; name: string; monthlyCents: number },
+    by: { id: string; name: string },
+    reason: string,
+    action: InterventionAction,
+    note: string | null,
+  ): Promise<void>;
 }
 
 export const useRetention = create<RetentionState>((set, get) => ({
@@ -122,7 +135,7 @@ export const useRetention = create<RetentionState>((set, get) => ({
         supabase!.rpc('members_at_risk', { t: tenant.id }),
         supabase!.rpc('kept_summary', { t: tenant.id, yr: year }),
       ]);
-      if (inputs.error || kept.error) throw new Error('Couldn’t load your members. Check your connection and try again.');
+      if (inputs.error || kept.error) throw new Error('Couldn’t load your clients. Check your connection and try again.');
       type KeptRow = {
         intervention_id: string; client_id: string; client_name: string; coach_id: string; coach_name: string; reason: string; note: string | null;
         requested_at: string; done_at: string | null; action: InterventionAction | null; action_note: string | null; still_active: boolean; left_on: string | null;
@@ -160,23 +173,23 @@ export const useRetention = create<RetentionState>((set, get) => ({
         loadedAt: new Date().toISOString(),
       });
     } catch (e) {
-      set({ status: get().loadedAt ? 'ready' : 'error', error: e instanceof Error ? e.message : 'Couldn’t load your members.' });
+      set({ status: get().loadedAt ? 'ready' : 'error', error: e instanceof Error ? e.message : 'Couldn’t load your clients.' });
     }
   },
 
-  async handToCoach(member, coachId, reason, note) {
+  async handToCoach(client, coachId, reason, note) {
     if (!isDemo()) {
-      const { error } = await supabase!.rpc('hand_to_coach', { t: tenant.id, client: member.clientId, coach: coachId, reason, note });
+      const { error } = await supabase!.rpc('hand_to_coach', { t: tenant.id, client: client.clientId, coach: coachId, reason, note });
       if (error) throw new Error(error.message);
       await Promise.all([get().load(), loadCoachData().catch(() => {})]);
       return;
     }
     const coach = useTeam.getState().coaches.find((c) => c.id === coachId);
-    const existing = get().interventions.find((i) => i.clientId === member.clientId && !i.doneOn);
+    const existing = get().interventions.find((i) => i.clientId === client.clientId && !i.doneOn);
     const row: Intervention = {
       id: existing?.id ?? `demo-${Date.now().toString(36)}`,
-      clientId: member.clientId,
-      clientName: member.name,
+      clientId: client.clientId,
+      clientName: client.name,
       coachId,
       coachName: coach?.name ?? 'Coach',
       reason,
@@ -185,7 +198,7 @@ export const useRetention = create<RetentionState>((set, get) => ({
       doneOn: null,
       action: null,
       actionNote: null,
-      monthlyCents: member.monthlyCents,
+      monthlyCents: client.monthlyCents,
     };
     const list = [...get().interventions.filter((i) => i.id !== row.id), row];
     set({ interventions: list });
@@ -204,22 +217,52 @@ export const useRetention = create<RetentionState>((set, get) => ({
     set({ interventions: list });
     save(list);
   },
+
+  async logCheckIn(client, by, reason, action, note) {
+    if (!isDemo()) {
+      const { error } = await supabase!.rpc('log_check_in', { t: tenant.id, client: client.clientId, reason, how: action, how_note: note });
+      if (error) throw new Error(error.message);
+      // kept_summary is owner-role only; an assistant's check-in still counts on the business view.
+      await Promise.all([get().status !== 'idle' ? get().load() : Promise.resolve(), loadCoachData().catch(() => {})]);
+      return;
+    }
+    const open = get().interventions.find((i) => i.clientId === client.clientId && !i.doneOn);
+    const row: Intervention = open
+      ? { ...open, doneOn: today(), action, actionNote: note }
+      : {
+          id: `demo-${Date.now().toString(36)}`,
+          clientId: client.clientId,
+          clientName: client.name,
+          coachId: by.id,
+          coachName: by.name,
+          reason,
+          note: null,
+          requestedOn: today(),
+          doneOn: today(),
+          action,
+          actionNote: note,
+          monthlyCents: client.monthlyCents,
+        };
+    const list = [...get().interventions.filter((i) => i.id !== row.id), row];
+    set({ interventions: list });
+    save(list);
+    syncDemoTriage(list);
+  },
 }));
 
-/** Derived views for the owner's screen and the web dashboard. */
-export function useRetentionViews(): { talk: MembersToTalkTo; kept: KeptSummary; openByClient: Map<string, Intervention> } {
-  const { activity, interventions, memberStatus: status } = useRetention();
+/** Derived views for the business view and client detail. */
+export function useRetentionViews(): { kept: KeptSummary; openByClient: Map<string, Intervention> } {
+  const { interventions, memberStatus: status } = useRetention();
   const t = today();
   return {
-    talk: membersToTalkTo(activity, t),
     kept: keptSummary(interventions, status, Number(t.slice(0, 4)), t),
     openByClient: new Map(interventions.filter((i) => !i.doneOn).map((i) => [i.clientId, i])),
   };
 }
 
 /**
- * Check-in requests are addressed to one coach: they see it (even for a member they don't coach);
- * everyone else, the owner included, sees it on the members screen instead of in Clients.
+ * Teams: check-in requests are addressed to one coach, who sees it (even for a client they don't
+ * coach). Everyone else, the head coach included, sees it as "Asked Leo" on client detail instead.
  */
 export function triageForViewer(items: TriageItem[], viewerId: string): TriageItem[] {
   return items.filter((t) => t.reason !== 'check_in_request' || !t.coachId || t.coachId === viewerId);
@@ -228,7 +271,7 @@ export function requestedClientIds(items: TriageItem[], viewerId: string): strin
   return items.filter((t) => t.reason === 'check_in_request' && t.coachId === viewerId && !t.handledAt).map((t) => t.clientId);
 }
 
-/** Demo only: put the owner's open check-in requests into the coach's Clients list. Live builds get them from triage_items. */
+/** Demo only: put the head coach's open check-in requests into the assistant's Clients list. Live builds get them from triage_items. */
 export function useDemoCheckInRequests() {
   useEffect(() => {
     if (isDemo() && useRetention.getState().status === 'idle') void useRetention.getState().load();

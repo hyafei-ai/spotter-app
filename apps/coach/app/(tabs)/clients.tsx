@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, Pressable, StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { buildTriage, reasonText, type ClientTriage } from '@spotter/core';
@@ -38,7 +38,8 @@ type Filter = 'needs' | 'all' | 'attention' | 'new' | 'paused' | 'payment';
 const FILTERS: { value: Filter; label: string }[] = [
   { value: 'needs', label: 'Needs you' },
   { value: 'all', label: 'All' },
-  // Who could use a check-in, with reasons from what each athlete shared (src/atrisk).
+  // The one "who to check in with" list: reasons from sessions, app use and what each client shared
+  // (src/atrisk). Me → Your business → "See who needs a check-in" opens it with ?filter=attention.
   { value: 'attention', label: 'Needs attention' },
   { value: 'new', label: 'New' },
   { value: 'paused', label: 'Paused' },
@@ -50,7 +51,15 @@ export default function Clients() {
   const { colors } = useTheme();
   const toast = useToast();
   const { clients: allClients, triage: allTriage, markHandled, restore, snooze } = useCoach();
-  const [filter, setFilter] = useState<Filter>('needs');
+  const params = useLocalSearchParams<{ filter?: string }>();
+  const fromParam = FILTERS.find((f) => f.value === params.filter)?.value;
+  const [filter, setFilter] = useState<Filter>(fromParam ?? 'needs');
+  // The tab stays mounted, so a later link with ?filter= switches the chip (adjusting state on a prop change).
+  const [lastParam, setLastParam] = useState(fromParam);
+  if (fromParam !== lastParam) {
+    setLastParam(fromParam);
+    if (fromParam) setFilter(fromParam);
+  }
   const [query, setQuery] = useState('');
   const [actionsFor, setActionsFor] = useState<DemoClient | null>(null);
   const [prepFor, setPrepFor] = useState<DemoClient | null>(null);
@@ -62,7 +71,7 @@ export default function Clients() {
   usePainTriage();
 
   // Assistants see only their assigned clients (K-8). Connected builds get this from RLS as well.
-  // Check-in requests from the owner are addressed to one coach, who sees that member too (retention).
+  // Teams: check-in requests from the head coach are addressed to one coach, who sees that client too.
   const { viewerId } = useRole();
   useDemoCheckInRequests();
   const checkIn = useCheckInDone();

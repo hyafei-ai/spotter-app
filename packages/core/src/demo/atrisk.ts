@@ -2,7 +2,8 @@
  * MOCK DATA — physiology the demo clients chose to share with their coach, and twelve weeks of MRR at
  * risk for the Maya Reyes Strength demo tenant. Everything here is invented for the preview build.
  * The live figures on screen are computed from it with the same functions as real data
- * (atRiskRoster, ownerRoster, mrrAtRisk, mrrAtRiskTrend); the earlier weeks are typed in.
+ * (atRiskRoster, ownerRoster, mrrAtRisk, mrrAtRiskTrend); the earlier weeks are typed in. Mei is
+ * coached by the demo assistant (Leo), so Maya sees Mei's shared signals only as the neutral line.
  */
 import { riskWeekStart, type MrrSnapshot, type PhysiologyInput } from '../atrisk';
 import { DEMO_CLIENTS } from './coach';

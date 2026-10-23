@@ -4,15 +4,22 @@ import { MIN_TENURE_DAYS, toSignals, type Intervention, type MemberActivity, typ
 import { interventionOutcome, memberRisk, type MemberRisk, type RiskLevel } from './signals';
 
 /**
- * Drop-out risk with physiology reasons (coach) and MRR at risk (owner). docs/features/at-risk.md.
+ * Who could use a check-in, with reasons, and the coach's business view (MRR at risk, kept).
+ * docs/features/at-risk.md.
  *
- * Builds on memberRisk (signals.ts), which stays as it is. Physiology adds transparent points, each
- * with a reason in coach language. The owner gets the same level through ownerView, with every
- * physiology reason replaced by one neutral line: the owner never sees an athlete's health data.
+ * Spotter has two roles: the client and the coach, and the coach owns their coaching business (the
+ * tenant "owner" role). Builds on memberRisk (signals.ts), which stays as it is. Physiology adds
+ * transparent points, each with a reason in coach language, from what the client shared with their
+ * coach. Their coach sees every reason.
+ *
+ * Teams are optional. When a coach grows a team, a client's health detail stays with the client's own
+ * coach: the head coach looking at an assistant's client gets the same level through ownerView, with
+ * every physiology reason replaced by one neutral line (viewerSeesHealth / reasonsFor). A solo coach
+ * never sees that line.
  *
  * Easy-day reads move from the engagement side to the physiology side ("Running tired"), so they
- * count only when the athlete shared them, and never reach the owner. memberRisk is called here with
- * easeReads zeroed for that reason.
+ * count only when the client shared them. memberRisk is called here with easeReads zeroed for that
+ * reason.
  */
 
 const DAY = 86_400_000;
@@ -45,7 +52,11 @@ const ENGAGEMENT_POINTS: [prefix: string, points: number][] = [
 ];
 export const engagementPoints = (reason: string) => ENGAGEMENT_POINTS.find(([p]) => reason.startsWith(p))?.[1] ?? 1;
 
-/** The full points table, for the explanation on the owner's Retention page and docs. */
+/**
+ * The full points table, for the explanation on the business view and docs. `owner: 'neutral'` marks
+ * the shared health signals: in a team, the head coach sees those as OWNER_NEUTRAL_REASON for clients
+ * an assistant coaches. For their own clients every reason is shown.
+ */
 export const RISK_POINTS_TABLE: { signal: string; points: number; owner: 'shown' | 'neutral' }[] = [
   { signal: 'Sessions fell to half of plan or less (last 2 weeks vs the 2 before)', points: 3, owner: 'shown' },
   { signal: 'No session in 10+ days', points: 2, owner: 'shown' },
@@ -136,9 +147,9 @@ const levelFor = (points: number): RiskLevel => (points >= 5 ? 'high' : points >
 const TENURE_REASON = 'In their first two months';
 
 /**
- * Engagement (memberRisk, without easy-day reads) plus physiology the athlete shared. `physio` is
+ * Engagement (memberRisk, without easy-day reads) plus physiology the client shared. `physio` is
  * null when nothing was shared, and the result is then engagement only. Same thresholds as
- * memberRisk: ≥ 5 high, 3–4 medium. A member in their first two months gets the +1 when either side
+ * memberRisk: ≥ 5 high, 3–4 medium. A client in their first two months gets the +1 when either side
  * has a signal, once.
  */
 export function athleteDropoutRisk(activity: MemberActivity, physio: PhysiologyInput | null, today: string): DropoutRisk {
@@ -155,14 +166,18 @@ export function athleteDropoutRisk(activity: MemberActivity, physio: PhysiologyI
   return { level: levelFor(points), points, reasons: ordered.map((f) => f.text), factors: ordered };
 }
 
-/* ---------- the owner's view ---------- */
+/* ---------- who sees health detail (teams only) ---------- */
 
-/** What the owner reads in place of any physiology reason. No health detail, on purpose. */
+/**
+ * What the head coach reads in place of a physiology reason for a client an assistant coaches. Only
+ * used in a team; a solo coach always sees the reasons themselves.
+ */
 export const OWNER_NEUTRAL_REASON = 'Their coach has flagged something worth a check-in';
 
 /**
- * The owner's copy of a risk: same level and points, engagement reasons kept, every physiology
- * reason collapsed into OWNER_NEUTRAL_REASON (once, where the first one was).
+ * The neutral copy of a risk, for a viewer who isn't the client's own coach: same level and points,
+ * engagement reasons kept, every physiology reason collapsed into OWNER_NEUTRAL_REASON (once, where
+ * the first one was). Use reasonsFor rather than calling this directly.
  */
 export function ownerView(risk: DropoutRisk): DropoutRisk {
   const factors: RiskFactor[] = [];
@@ -175,6 +190,31 @@ export function ownerView(risk: DropoutRisk): DropoutRisk {
     } else flag.points += f.points;
   }
   return { level: risk.level, points: risk.points, reasons: factors.map((f) => f.text), factors };
+}
+
+/**
+ * Whether `viewerId` sees what this client shared about their body (cycle, symptoms, fuelling, pain,
+ * reads). The client's own coach does. A client with no assigned coach belongs to the business's coach.
+ * In a team, the head coach doesn't see it for a client an assistant coaches (docs/physiology.md rule 4).
+ * `solo` (no other active coaches) always returns true, so a stale assignment can't hide anything.
+ */
+export function viewerSeesHealth(viewerId: string, client: { coachId: string | null }, opts: { solo?: boolean } = {}): boolean {
+  return !!opts.solo || client.coachId == null || client.coachId === viewerId;
+}
+
+/** The reasons this viewer reads: all of them for the client's own coach, the neutral copy otherwise. */
+export function reasonsFor(viewerId: string, client: { coachId: string | null }, risk: DropoutRisk, opts: { solo?: boolean } = {}): DropoutRisk {
+  return viewerSeesHealth(viewerId, client, opts) ? risk : ownerView(risk);
+}
+
+/**
+ * Teams only: the other coach to ask when the viewer isn't this client's coach ("Ask Leo to check
+ * in"). Null when the viewer coaches them, nobody is assigned, or that coach isn't active on the team,
+ * so a solo coach never sees hand-off UI.
+ */
+export function checkInCoach<C extends { id: string; status?: string }>(viewerId: string, client: { coachId: string | null }, coaches: C[]): C | null {
+  if (!client.coachId || client.coachId === viewerId) return null;
+  return coaches.find((c) => c.id === client.coachId && (c.status == null || c.status === 'active')) ?? null;
 }
 
 /* ---------- lists ---------- */
@@ -195,7 +235,7 @@ const tenure = (a: MemberActivity, today: string) => dayNum(today) - dayNum(a.jo
 
 /**
  * Everyone live and past their first two weeks, with their risk, most urgent first (level, then
- * points, then name). The coach roster shows high and medium; `includeLow` keeps the rest.
+ * points, then name). The Needs attention list shows high and medium; `includeLow` keeps the rest.
  */
 export function atRiskRoster(
   activity: (MemberActivity & { currency?: string | null })[],
@@ -218,14 +258,20 @@ export function atRiskRoster(
     .sort((a, b) => LEVEL_ORDER[a.risk.level] - LEVEL_ORDER[b.risk.level] || b.risk.points - a.risk.points || a.name.localeCompare(b.name));
 }
 
-/** The owner's list: the same members and levels, with owner-safe reasons only. */
+/**
+ * The business view's list: the same clients and levels, sorted by level then monthly value. With
+ * `viewerId` (the coach who owns the business), their own clients keep every reason and only an
+ * assistant's clients get the neutral line (reasonsFor). Without it, every client gets the neutral
+ * copy, for callers that can't tell who is looking.
+ */
 export function ownerRoster(
   activity: (MemberActivity & { currency?: string | null })[],
   physio: Record<string, PhysiologyInput | null | undefined>,
   today: string,
+  opts: { viewerId?: string; solo?: boolean } = {},
 ): AtRiskMember[] {
   return atRiskRoster(activity, physio, today)
-    .map((m) => ({ ...m, risk: ownerView(m.risk) }))
+    .map((m) => ({ ...m, risk: opts.viewerId != null ? reasonsFor(opts.viewerId, m, m.risk, { solo: opts.solo }) : ownerView(m.risk) }))
     .sort((a, b) => LEVEL_ORDER[a.risk.level] - LEVEL_ORDER[b.risk.level] || b.monthlyCents - a.monthlyCents || a.name.localeCompare(b.name));
 }
 
@@ -243,14 +289,14 @@ export interface MrrAtRiskRow {
   highCents: number;
   mediumCents: number;
   totalCents: number;
-  /** High and medium members in this currency (including any with no recurring value). */
+  /** High and medium clients in this currency (including any with no recurring value). */
   count: number;
   highCount: number;
   mediumCount: number;
 }
 
 /**
- * Monthly recurring revenue from high and medium members, one row per currency. Amounts are never
+ * Monthly recurring revenue from high and medium clients, one row per currency. Amounts are never
  * added across currencies. Rows are sorted by total, largest first.
  */
 export function mrrAtRisk(members: { monthlyCents: number; level: RiskLevel; currency: string }[]): MrrAtRiskRow[] {
@@ -332,13 +378,13 @@ export function mrrAtRiskTrend(snapshots: MrrSnapshot[], today: string, opts: { 
 
 export interface MrrKeptRow {
   currency: string;
-  /** Monthly value of members still active 60 days after a coach checked in. */
+  /** Monthly value of clients still active 60 days after a check-in. */
   monthlyCents: number;
   count: number;
 }
 
 /**
- * Monthly value kept after check-ins, per currency, each member once (their latest kept check-in).
+ * Monthly value kept after check-ins, per currency, each client once (their latest kept check-in).
  * Uses interventionOutcome: kept = still active 60 days after the coach checked in. With `year`,
  * only check-ins done that year count.
  */

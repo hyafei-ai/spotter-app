@@ -5,6 +5,7 @@ import {
   RISK_POINTS_TABLE,
   athleteDropoutRisk,
   atRiskRoster,
+  checkInCoach,
   engagementPoints,
   memberRisk,
   mrrAtRisk,
@@ -13,8 +14,10 @@ import {
   mrrKept,
   ownerRoster,
   ownerView,
+  reasonsFor,
   riskWeekStart,
   toSignals,
+  viewerSeesHealth,
   type Intervention,
   type MemberActivity,
   type PhysiologyInput,
@@ -139,6 +142,59 @@ describe('ownerView', () => {
   });
 });
 
+describe('who sees health detail', () => {
+  const COACH = 'maya';
+  const ASSISTANT = 'leo';
+  const risk = athleteDropoutRisk(
+    activity({ lastSessionAt: '2026-10-10T08:00:00Z' }),
+    physio({ painOngoing: true, pain: { region: 'knee', side: 'left', days: 4 }, fuelLevel: 'watch' }),
+    today,
+  );
+
+  it('the client’s own coach sees every reason', () => {
+    expect(viewerSeesHealth(COACH, { coachId: COACH })).toBe(true);
+    expect(reasonsFor(COACH, { coachId: COACH }, risk)).toBe(risk);
+    expect(reasonsFor(COACH, { coachId: COACH }, risk).reasons).toContain('Left knee pain for 4 days');
+  });
+
+  it('a client with no assigned coach belongs to the business’s coach: no neutral line', () => {
+    expect(viewerSeesHealth(COACH, { coachId: null })).toBe(true);
+    expect(reasonsFor(COACH, { coachId: null }, risk).reasons).not.toContain(OWNER_NEUTRAL_REASON);
+  });
+
+  it('solo: never a neutral line, even with a stale assignment', () => {
+    expect(viewerSeesHealth(COACH, { coachId: 'someone-who-left' }, { solo: true })).toBe(true);
+    expect(reasonsFor(COACH, { coachId: 'someone-who-left' }, risk, { solo: true }).reasons).not.toContain(OWNER_NEUTRAL_REASON);
+  });
+
+  it('team: the head coach gets the neutral line for an assistant’s client, same level and points', () => {
+    expect(viewerSeesHealth(COACH, { coachId: ASSISTANT })).toBe(false);
+    const seen = reasonsFor(COACH, { coachId: ASSISTANT }, risk);
+    expect(seen.level).toBe(risk.level);
+    expect(seen.points).toBe(risk.points);
+    expect(seen.reasons).toContain(OWNER_NEUTRAL_REASON);
+    expect(seen.reasons.join(' ')).not.toMatch(/knee|pain|fuel/i);
+  });
+
+  it('team: an assistant asked about the head coach’s client doesn’t see their health detail either', () => {
+    expect(viewerSeesHealth(ASSISTANT, { coachId: COACH })).toBe(false);
+  });
+
+  it('checkInCoach offers a hand-off only to another active coach', () => {
+    const coaches = [
+      { id: COACH, name: 'Maya Reyes', status: 'active' },
+      { id: ASSISTANT, name: 'Leo Park', status: 'active' },
+      { id: 'sam', name: 'Sam Invited', status: 'invited' },
+    ];
+    expect(checkInCoach(COACH, { coachId: ASSISTANT }, coaches)?.name).toBe('Leo Park');
+    expect(checkInCoach(COACH, { coachId: COACH }, coaches)).toBeNull();
+    expect(checkInCoach(COACH, { coachId: null }, coaches)).toBeNull();
+    expect(checkInCoach(COACH, { coachId: 'sam' }, coaches)).toBeNull();
+    // Solo: nobody else on the team, so no hand-off UI.
+    expect(checkInCoach(COACH, { coachId: ASSISTANT }, [coaches[0]!])).toBeNull();
+  });
+});
+
 describe('rosters', () => {
   const now = NOW;
   const act = demoMemberActivity(now).map((a) => ({ ...a, currency: 'usd' }));
@@ -166,6 +222,19 @@ describe('rosters', () => {
     const text = JSON.stringify(owner.map((m) => m.risk)).toLowerCase();
     for (const word of ['tired', 'fuel', 'shoulder', 'pain', 'best']) expect(text).not.toContain(word);
     expect(owner.find((m) => m.name === 'Aisha Bello')!.risk.reasons).toEqual([OWNER_NEUTRAL_REASON]);
+  });
+
+  it('business view for the coach who owns it: full reasons for their own clients, neutral only for an assistant’s', () => {
+    const coachOf: Record<string, string> = { [c[5]!.id]: 'leo' };
+    const team = demoMemberActivity(now, coachOf).map((a) => ({ ...a, coachId: a.coachId ?? 'maya', currency: 'usd' }));
+    const owner = ownerRoster(team, demoPhysiology(), today, { viewerId: 'maya' });
+    expect(owner.find((m) => m.name === 'Aisha Bello')!.risk.reasons).toEqual(['Left shoulder pain for 5 days', 'No new best in 9 weeks']);
+    const mei = owner.find((m) => m.name === 'Mei Tanaka')!;
+    expect(mei.risk.reasons).toContain(OWNER_NEUTRAL_REASON);
+    expect(JSON.stringify(mei.risk)).not.toMatch(/tired|fuel/i);
+    // Solo: no neutral line anywhere.
+    const solo = ownerRoster(team, demoPhysiology(), today, { viewerId: 'maya', solo: true });
+    expect(solo.flatMap((m) => m.risk.reasons)).not.toContain(OWNER_NEUTRAL_REASON);
   });
 
   it('coach copy never says churn or risk', () => {

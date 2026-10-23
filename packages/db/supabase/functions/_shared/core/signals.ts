@@ -4,7 +4,7 @@ import { isoDate, isoDateTime } from './schemas.ts';
 
 /**
  * Body-variance signals shared by the athlete's daily read, the coach's memory and prep, and the
- * owner's members-at-risk list. Everything here is rule-based and explainable: each output says
+ * coach's "who needs a check-in" list. Everything here is rule-based and explainable: each output says
  * which inputs produced it. No scores are shown to athletes, and no medical claims are made.
  * See docs/jtbd.md for the jobs these serve.
  */
@@ -245,7 +245,7 @@ export function applyLighter<E extends { sets: { loadKg: number | null }[] }>(ex
   });
 }
 
-/* ---------- members at risk (owner) ---------- */
+/* ---------- clients who could use a check-in ---------- */
 
 export interface MemberSignals {
   /** Sessions done vs planned in each of the last 4 weeks, oldest first. */
@@ -268,7 +268,7 @@ export interface MemberRisk {
 }
 
 /**
- * Transparent points, no black box: each signal adds points and a plain reason the owner can read.
+ * Transparent points, no black box: each signal adds points and a plain reason the coach can read.
  * ≥ 5 high, 3–4 medium. Thresholds are in this function and covered by tests.
  */
 export function memberRisk(s: MemberSignals): MemberRisk {
@@ -310,13 +310,13 @@ export function memberRisk(s: MemberSignals): MemberRisk {
   return { level, points, reasons };
 }
 
-/** Yearly revenue at stake for a member: their monthly value × 12. Shown with the assumption spelled out. */
+/** Yearly revenue at stake for a client: their monthly value × 12. Shown with the assumption spelled out. */
 export const yearlyValueCents = (monthlyCents: number) => monthlyCents * 12;
 
 export const KEPT_AFTER_DAYS = 60;
 export type InterventionOutcome = 'kept' | 'left' | 'pending';
 
-/** A member counts as kept when still active 60 days after the coach stepped in. */
+/** A client counts as kept when still active 60 days after the coach stepped in. */
 export function interventionOutcome(intervenedOn: string, stillActive: boolean, leftOn: string | null, today: string): InterventionOutcome {
   if (!stillActive || leftOn) return 'left';
   return dayNum(today) - dayNum(intervenedOn) >= KEPT_AFTER_DAYS ? 'kept' : 'pending';

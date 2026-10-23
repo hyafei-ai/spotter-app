@@ -2,16 +2,17 @@ import { formatMoney, monthlyRevenueCents, type Currency, type SubscriptionLike 
 import { interventionOutcome, memberRisk, yearlyValueCents, type InterventionOutcome, type MemberRisk, type MemberSignals } from './signals';
 
 /**
- * Owner job (docs/jtbd.md): show coaches who to check in with before a member leaves, and show which
- * members stayed after a coach did. Assembles raw activity into the signals in signals.ts; the rules
- * themselves live there. Values come from the member's real subscription only.
+ * The coach's business job (docs/jtbd.md): keep clients and income. Shows who to check in with before
+ * a client leaves, and which clients stayed after a check-in. Assembles raw activity into the signals
+ * in signals.ts; the rules themselves live there. Values come from the client's real subscription
+ * only. (Types keep their "Member" names: they mirror memberships rows.)
  */
 
 const DAY = 86_400_000;
 const days = (from: string | null, today: string) =>
   from == null ? null : Math.max(0, Math.floor((Date.parse(`${today}T12:00:00Z`) - Date.parse(from)) / DAY));
 
-/** One member's raw activity, as returned by member_risk_inputs() or built from demo data. */
+/** One client's raw activity, as returned by member_risk_inputs() or built from demo data. */
 export interface MemberActivity {
   clientId: string;
   name: string;
@@ -35,8 +36,9 @@ export function toSignals(a: MemberActivity, today: string): MemberSignals {
     weeks: a.weeks,
     daysSinceLastOpen: days(a.lastAppOpenAt, today),
     daysSinceLastSession: days(a.lastSessionAt, today),
-    // Owner path: easy-day reads come from athletes' daily checks, which owners never see
-    // (docs/physiology.md rule 4). Coaches get tiredness through atrisk.ts, from shared reads only.
+    // Easy-day reads come from the client's daily checks. They count only when the client shared
+    // them with their coach (docs/physiology.md rule 4), through atrisk.ts from shared reads only.
+    // The server-side figures (members_at_risk, mrr_at_risk) never read health tables.
     easeReadsRecent: 0,
     easeReadsBefore: 0,
     checkInsMissed: a.checkInsMissed,
@@ -57,7 +59,7 @@ export interface MemberAssessment {
   yearlyCents: number | null;
 }
 
-/** Members need two weeks of history before a read means anything. */
+/** Clients need two weeks of history before a read means anything. */
 export const MIN_TENURE_DAYS = 14;
 
 const LEVEL_ORDER = { high: 0, medium: 1, low: 2 } as const;
@@ -65,9 +67,9 @@ const LEVEL_ORDER = { high: 0, medium: 1, low: 2 } as const;
 export interface MembersToTalkTo {
   /** High and medium, most urgent first, then by yearly value. */
   members: MemberAssessment[];
-  /** Members too new to read yet. */
+  /** Clients too new to read yet. */
   tooNew: number;
-  /** Members considered at all (not paused or ended). */
+  /** Clients considered at all (not paused or ended). */
   considered: number;
 }
 
@@ -102,6 +104,12 @@ export function approxMoney(cents: number, currency: Currency | string): string 
   return `≈ ${formatMoney(Math.round(cents / 100) * 100, c)}`;
 }
 
+/** A plan's monthly value, short, for a list row: "$160/mo". Whole units; shown to the coach who owns the business only. */
+export function monthlyValueText(monthlyCents: number, currency: Currency | string): string {
+  const c = (['usd', 'gbp', 'eur', 'cad', 'aud'] as const).find((x) => x === currency) ?? 'usd';
+  return `${formatMoney(Math.round(monthlyCents / 100) * 100, c)}/mo`;
+}
+
 /** The assumption behind a yearly figure, spelled out next to it. */
 export function yearlyAssumption(monthlyCents: number, currency: Currency | string): string {
   const c = (['usd', 'gbp', 'eur', 'cad', 'aud'] as const).find((x) => x === currency) ?? 'usd';
@@ -109,12 +117,12 @@ export function yearlyAssumption(monthlyCents: number, currency: Currency | stri
 }
 
 /**
- * What Spotter costs the owner per month, for the optional "Spotter costs ≈ $X a year" line.
+ * What Spotter costs the coach per month, for the optional "Spotter costs ≈ $X a year" line.
  * Pricing is still an open question in the spec, so this stays null and the line stays hidden.
  */
 export const SPOTTER_PRICE_MONTHLY_CENTS: number | null = null;
 
-/* ---------- handing to a coach, and what happened ---------- */
+/* ---------- check-ins, and what happened ---------- */
 
 export type InterventionAction = 'message' | 'call' | 'session' | 'other';
 export const INTERVENTION_ACTIONS: { value: InterventionAction; label: string }[] = [
@@ -137,7 +145,7 @@ export interface Intervention {
   clientName: string;
   coachId: string;
   coachName: string;
-  /** The top reason when the owner asked: plain facts, never risk wording. */
+  /** The top reason when the check-in was asked for or logged: plain facts, never risk wording. */
   reason: string;
   note: string | null;
   requestedOn: string;
@@ -148,14 +156,17 @@ export interface Intervention {
   monthlyCents: number;
 }
 
-/** The coach-facing line in their Clients list. Never says churn or risk. */
-export function checkInRequestText(ownerFirstName: string, topReason: string): string {
-  return `${ownerFirstName} asked you to check in: ${topReason.charAt(0).toLowerCase()}${topReason.slice(1)}`;
+/**
+ * Teams only: the line an assistant coach sees in their Clients list when the head coach asks them to
+ * check in. Never says churn or risk.
+ */
+export function checkInRequestText(fromFirstName: string, topReason: string): string {
+  return `${fromFirstName} asked you to check in: ${topReason.charAt(0).toLowerCase()}${topReason.slice(1)}`;
 }
 
 /** Shown with every kept figure, word for word. */
 export const KEPT_CAVEAT =
-  'Members still with you 60 days after a coach checked in. This shows they stayed, not that the check-in alone kept them.';
+  'Clients still with you 60 days after a check-in. This shows they stayed, not that the check-in alone kept them.';
 
 export interface KeptRow extends Intervention {
   outcome: InterventionOutcome | 'waiting';
@@ -175,7 +186,7 @@ export type MemberStatus = Record<string, { active: boolean; leftOn: string | nu
 
 /**
  * Interventions from `year`, each with its outcome via interventionOutcome: kept = still active 60
- * days after the coach checked in. Status comes from the member's subscription.
+ * days after the check-in. Status comes from the client's subscription.
  */
 export function keptSummary(interventions: Intervention[], status: MemberStatus, year: number, today: string): KeptSummary {
   const rows: KeptRow[] = interventions.map((i) => {
@@ -237,7 +248,7 @@ export interface MemberRiskInputRow {
 export function activityFromRow(r: MemberRiskInputRow): MemberActivity {
   return {
     clientId: r.client_id,
-    name: r.full_name || 'Member',
+    name: r.full_name || 'Client',
     planName: r.plan_name,
     coachId: r.coach_id,
     weeks: r.weeks ?? [],

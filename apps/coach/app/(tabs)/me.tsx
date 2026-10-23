@@ -20,7 +20,7 @@ export default function Me() {
       <ListRow
         left={<Monogram initials={isOwner ? tenant.coach.monogram : initials(name)} size={40} />}
         title={name}
-        subtitle={`${isOwner ? 'Owner' : 'Assistant coach'} · ${tenant.appName}`}
+        subtitle={`${isOwner ? 'Coach' : 'Assistant coach'} · ${tenant.appName}`}
       />
       <SectionLabel>Onboarding</SectionLabel>
       <ListRow
@@ -43,7 +43,7 @@ export default function Me() {
               value={isOwner ? 'owner' : 'assistant'}
               onChange={(v) => setViewer(v === 'owner' ? DEMO_TEAM_IDS.OWNER_ID : DEMO_TEAM_IDS.ASSISTANT_ID)}
               options={[
-                { value: 'owner', label: 'Owner' },
+                { value: 'owner', label: 'You (head coach)' },
                 { value: 'assistant', label: 'Assistant coach' },
               ]}
             />

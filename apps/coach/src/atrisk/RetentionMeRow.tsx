@@ -3,15 +3,15 @@ import { approxMoney } from '@spotter/core';
 import { ListRow } from '@spotter/ui';
 import { useOwnerRetention } from './ownerRetention';
 
-/** Owner's Me tab: MRR at risk at a glance. Wrapped in OwnerOnly by MeRows. */
+/** Me → Your business: monthly income at risk at a glance. Owner role only (rendered inside PlatformRows' owner section). */
 export function RetentionMeRow() {
   const { status, atRisk } = useOwnerRetention();
   const n = atRisk.reduce((s, r) => s + r.count, 0);
   const subtitle =
     status !== 'ready'
-      ? 'MRR at risk, trend, and what check-ins kept'
+      ? 'Income at risk, the trend, and who stayed after a check-in'
       : atRisk.length === 0
         ? 'Nothing at risk this week'
-        : `${atRisk.map((r) => `${approxMoney(r.totalCents, r.currency)}`).join(' and ')} a month at risk · ${n} member${n === 1 ? '' : 's'}`;
-  return <ListRow title="Retention" subtitle={subtitle} chevron last onPress={() => router.push('/retention')} />;
+        : `${atRisk.map((r) => `${approxMoney(r.totalCents, r.currency)}`).join(' and ')} a month at risk · ${n} client${n === 1 ? '' : 's'}`;
+  return <ListRow title="Keeping clients" subtitle={subtitle} chevron onPress={() => router.push('/retention')} />;
 }
