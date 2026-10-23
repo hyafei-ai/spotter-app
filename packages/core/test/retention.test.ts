@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   activityFromRow,
   buildTriage,
+  KEPT_CAVEAT,
   checkInRequestText,
   keptSummary,
   memberStatus,
   membersToTalkTo,
+  monthlyValueText,
   reasonText,
   toSignals,
   type Intervention,
@@ -157,6 +159,17 @@ describe('keptSummary', () => {
     expect(s.keptYearlyCents).toBe(576000);
     expect(s.left.map((r) => r.clientName)).toEqual(['Sam Whitford']);
     expect(s.pending).toHaveLength(1);
+  });
+});
+
+describe('wording', () => {
+  it('plan value is short and whole: "$160/mo"', () => {
+    expect(monthlyValueText(16000, 'usd')).toBe('$160/mo');
+    expect(monthlyValueText(20533, 'gbp')).toBe('£205/mo');
+  });
+  it('kept caveat talks about clients, never members or churn', () => {
+    expect(KEPT_CAVEAT).toMatch(/^Clients still with you 60 days after a check-in\./);
+    expect(KEPT_CAVEAT).not.toMatch(/member|churn/i);
   });
 });
 

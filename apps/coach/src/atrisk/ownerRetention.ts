@@ -5,7 +5,7 @@ import {
   mrrAtRiskTrend,
   mrrFromRow,
   mrrKept,
-  ownerRoster,
+  atRiskRoster,
   snapshotFromRow,
   type MrrAtRiskDbRow,
   type MrrAtRiskRow,
@@ -22,10 +22,11 @@ import { useRetention } from '../retention/store';
 import { localToday, usePhysiologyMap } from './inputs';
 
 /*
- * Owner job (docs/jtbd.md): live MRR at risk, its 12-week trend, and MRR kept after a check-in.
- * Engagement and money only; physiology reaches the owner as a coach flag with no detail (ownerView).
- * Demo: MOCK member activity, shared physiology and earlier weeks from @spotter/core/demo, recomputed
- * on load. Connected: mrr_at_risk(tenant) and the owner-only mrr_at_risk_snapshots table.
+ * The coach's business view (docs/jtbd.md): live MRR at risk, its 12-week trend, and MRR kept after a
+ * check-in. Owner role only (the coach who owns the business), so assistants never see money.
+ * Demo: MOCK client activity, shared physiology and earlier weeks from @spotter/core/demo, recomputed
+ * on load. Connected: mrr_at_risk(tenant) and the owner-only mrr_at_risk_snapshots table, which count
+ * engagement only (see docs/features/at-risk.md, gaps).
  */
 
 const isDemo = () => !isConfigured() || !supabase;
@@ -91,7 +92,8 @@ export function useOwnerRetention(): OwnerRetention {
 
   const atRisk = useMemo(() => {
     if (!demo) return liveState.rows;
-    const roster = ownerRoster(
+    // Levels only: reasons don't change the money, so atRiskRoster is enough here.
+    const roster = atRiskRoster(
       activity.map((a) => ({ ...a, currency })),
       physio,
       today,

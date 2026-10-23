@@ -1,7 +1,9 @@
 /*
- * MOCK DATA — member activity and coach check-ins for the Maya Reyes Strength demo tenant.
- * Everything here is invented for the preview build. It runs through the same functions as real
- * data (membersToTalkTo, keptSummary), so the numbers on screen are computed, not typed in.
+ * MOCK DATA — client activity and check-ins for the Maya Reyes Strength demo tenant. Maya owns the
+ * business and coaches most clients herself; Leo Park is an optional assistant coach, so the demo
+ * also shows the team case. Everything here is invented for the preview build. It runs through the
+ * same functions as real data (atRiskRoster, keptSummary, mrrKept), so the numbers on screen are
+ * computed, not typed in.
  */
 import { monthlyRevenueCents, type SubscriptionLike } from '../grow';
 import type { Intervention, MemberActivity } from '../retention';
@@ -24,8 +26,8 @@ const steady = (planned: number, done: number) => Array.from({ length: 4 }, () =
 
 /**
  * One row per demo client. Chris has dropped off (high) and Priya's card failed with check-ins
- * skipped (medium). Mei has had a rough few weeks: easy-day reads come from the athlete daily check,
- * so they reach only the coach (as shared "running tired"), never the owner's list.
+ * skipped (medium). Mei has had a rough few weeks: easy-day reads come from the client's daily check,
+ * so they count only as shared "running tired", seen by Mei's own coach.
  */
 const SHAPES: Shape[] = [
   { weeks: steady(3, 3), openedDaysAgo: 1, sessionDaysAgo: 7, easeReadsRecent: 0, easeReadsBefore: 0, checkInsMissed: 0 },
@@ -62,7 +64,7 @@ export function demoMemberActivity(now = Date.now(), coachOf: Record<string, str
   });
 }
 
-/** Subscriptions including the former member whose check-in didn't keep them. */
+/** Subscriptions including the former client whose check-in didn't keep them. */
 export function demoRetentionSubscriptions(now = Date.now()): SubscriptionLike[] {
   return [
     ...demoSubscriptions(now),

@@ -9,7 +9,7 @@ import { useRole, useTeam } from '../../src/platform/team';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** K-8 team: coaches, their clients and revenue splits; invite an assistant coach. Owner only. */
+/** K-8 team: coaches, their clients and revenue splits; invite an assistant coach. Head coach (owner role) only. */
 export default function Team() {
   const toast = useToast();
   const { isOwner } = useRole();
@@ -28,7 +28,7 @@ export default function Team() {
     return (
       <Screen>
         <View style={styles.nav}>{back}</View>
-        <EmptyState message="Only the owner manages the team." />
+        <EmptyState message="Only the head coach manages the team." />
       </Screen>
     );
   }

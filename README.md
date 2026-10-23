@@ -53,6 +53,6 @@ Every phase of the build plan has a working implementation. Each one runs fully 
 
 ## Backend
 
-`packages/db/supabase/migrations`: tenancy, versioned intake forms (owner-only edits, one live form per tenant), programs, sessions/sets, PRs (derived by trigger), messaging, triage, AI-draft audit, devices, audit log, plus RLS on every table. `sync_apply(mutations, client_ip)` applies offline batches under the caller's RLS: idempotent by `client_mutation_id`, newest `logged_at` wins per (session, exercise, set index), and one bad mutation never blocks the batch. The Edge Function `sync-push` validates with the shared Zod schemas (`pnpm --filter @spotter/db sync-schemas` copies them in) and calls it.
+`packages/db/supabase/migrations`: tenancy, versioned intake forms (only the coach who owns the business edits them, one live form per tenant), programs, sessions/sets, PRs (derived by trigger), messaging, triage, AI-draft audit, devices, audit log, plus RLS on every table. `sync_apply(mutations, client_ip)` applies offline batches under the caller's RLS: idempotent by `client_mutation_id`, newest `logged_at` wins per (session, exercise, set index), and one bad mutation never blocks the batch. The Edge Function `sync-push` validates with the shared Zod schemas (`pnpm --filter @spotter/db sync-schemas` copies them in) and calls it.
 
 Deploy: `supabase link`, `supabase db push`, `supabase functions deploy sync-push`.

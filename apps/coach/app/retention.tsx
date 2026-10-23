@@ -1,13 +1,31 @@
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { KEPT_CAVEAT, approxMoney, type MrrTrend } from '@spotter/core';
-import { EmptyState, IconButton, ListRow, Screen, SectionLabel, Skeleton, Text, useTheme, margin, space } from '@spotter/ui';
+import {
+  INTERVENTION_DONE_LABEL,
+  KEPT_AFTER_DAYS,
+  KEPT_CAVEAT,
+  OWNER_NEUTRAL_REASON,
+  SPOTTER_PRICE_MONTHLY_CENTS,
+  approxMoney,
+  yearlyValueCents,
+  type KeptRow,
+  type MrrTrend,
+} from '@spotter/core';
+import { Button, EmptyState, IconButton, ListRow, Screen, SectionLabel, Skeleton, Tag, Text, useTheme, margin, space } from '@spotter/ui';
 import { useRole } from '../src/platform/team';
 import { useOwnerRetention } from '../src/atrisk/ownerRetention';
+import { useViewerLens } from '../src/atrisk/AtRiskList';
+import { useRetention, useRetentionViews } from '../src/retention/store';
 
+const DAY = 86_400_000;
 const weekLabel = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+const shortDate = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
-/** Owner job: live MRR at risk, the last 12 weeks, and what check-ins kept. Owner only; no health data. */
+/**
+ * Me → Your business → Keeping clients. The coach's business job (docs/jtbd.md): income at risk this
+ * month, the last 12 weeks, and who stayed after a check-in. Owner role only, so assistant coaches in
+ * a team never see money. Who to check in with is one list, Clients → Needs attention.
+ */
 export default function Retention() {
   const { isOwner } = useRole();
   const back = <IconButton icon="arrow-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/me'))} />;
@@ -15,55 +33,70 @@ export default function Retention() {
     return (
       <Screen>
         <View style={styles.nav}>{back}</View>
-        <EmptyState message="Only the owner sees retention." />
+        <EmptyState message="Only the head coach sees the business numbers." actionLabel="See who needs a check-in" onAction={() => router.replace('/clients?filter=attention')} />
       </Screen>
     );
   }
-  return <OwnerRetentionScreen back={back} />;
+  return <BusinessScreen back={back} />;
 }
 
-function OwnerRetentionScreen({ back }: { back: React.ReactNode }) {
+function BusinessScreen({ back }: { back: React.ReactNode }) {
   const { status, live, atRisk, trend, kept, year, reload } = useOwnerRetention();
+  const { solo } = useViewerLens();
+  const { kept: keptList } = useRetentionViews();
+  const currency = useRetention((s) => s.currency);
+  const n = atRisk.reduce((s, r) => s + r.count, 0);
   return (
     <Screen>
       <View style={styles.nav}>{back}</View>
       <View style={styles.head}>
         <Text variant="title" accessibilityRole="header">
-          Retention
+          Keeping clients
         </Text>
-        <Text color="ink2">Monthly revenue from members whose training or app use has dropped off, or whose coach has flagged something.</Text>
+        <Text color="ink2">Monthly income from clients whose training, app use or what they shared with you says a check-in would help.</Text>
         {!live ? (
           <Text variant="caption" color="ink2">
-            Sample members (MOCK). This week is worked out from them on load; earlier weeks are sample figures.
+            Sample clients (MOCK). This week is worked out from them on load; earlier weeks are sample figures.
           </Text>
         ) : null}
       </View>
 
       {status === 'loading' ? (
-        <View style={styles.body}>
+        <View style={styles.body} accessibilityLabel="Loading" accessibilityRole="progressbar">
           <Skeleton width="60%" height={28} />
           <Skeleton width="80%" />
         </View>
       ) : status === 'error' ? (
-        <EmptyState message="Couldn’t load retention. Check your connection." actionLabel="Try again" onAction={reload} />
+        <EmptyState message="Couldn’t load your numbers. Check your connection." actionLabel="Try again" onAction={reload} />
       ) : (
         <>
-          <SectionLabel>MRR at risk</SectionLabel>
+          <SectionLabel>At risk this month</SectionLabel>
           <View style={styles.body}>
             {atRisk.length === 0 ? (
-              <Text>Nothing at risk this week.</Text>
+              <Text>Nothing at risk this week. Everyone’s training and checking in as usual.</Text>
             ) : (
               atRisk.map((r) => (
-                <View key={r.currency} style={{ gap: space[1] }} accessible accessibilityLabel={`${approxMoney(r.totalCents, r.currency)} a month at risk, ${r.count} members`}>
+                <View
+                  key={r.currency}
+                  style={{ gap: space[1] }}
+                  accessible
+                  accessibilityLabel={`${approxMoney(r.totalCents, r.currency)} a month at risk, ${r.count} client${r.count === 1 ? '' : 's'}`}
+                >
                   <Text variant="figure" tabular>
                     {approxMoney(r.totalCents, r.currency)} a month
                   </Text>
                   <Text color="ink2">
-                    {r.count} member{r.count === 1 ? '' : 's'} · high {approxMoney(r.highCents, r.currency)} ({r.highCount}) · medium {approxMoney(r.mediumCents, r.currency)} ({r.mediumCount})
+                    {r.count} client{r.count === 1 ? '' : 's'} · needs a check-in soon {approxMoney(r.highCents, r.currency)} ({r.highCount}) · worth watching{' '}
+                    {approxMoney(r.mediumCents, r.currency)} ({r.mediumCount})
                   </Text>
                 </View>
               ))
             )}
+            <Button
+              label={n ? `See who needs a check-in (${n})` : 'See who needs a check-in'}
+              icon="users"
+              onPress={() => router.push('/clients?filter=attention')}
+            />
           </View>
 
           {trend.map((t) => (
@@ -73,28 +106,90 @@ function OwnerRetentionScreen({ back }: { back: React.ReactNode }) {
           <SectionLabel>{`Kept after a check-in, ${year}`}</SectionLabel>
           <View style={styles.body}>
             {kept.length === 0 ? (
-              <Text color="ink2">No one kept yet this year. Members count once they’re still with you 60 days after a check-in.</Text>
+              <Text color="ink2">No one kept yet this year. Clients count once they’re still with you 60 days after a check-in.</Text>
             ) : (
               kept.map((k) => (
-                <Text key={k.currency} variant="bodyStrong">
-                  {approxMoney(k.monthlyCents, k.currency)} a month · {k.count} member{k.count === 1 ? '' : 's'}
+                <Text key={k.currency} variant="headline">
+                  {approxMoney(k.monthlyCents, k.currency)} a month · {k.count} client{k.count === 1 ? '' : 's'}
+                  {k.monthlyCents ? <Text color="ink2">{` (${approxMoney(yearlyValueCents(k.monthlyCents), k.currency)} a year)`}</Text> : null}
                 </Text>
               ))
             )}
             <Text variant="caption" color="ink2">
               {KEPT_CAVEAT}
             </Text>
+            {SPOTTER_PRICE_MONTHLY_CENTS != null && kept.length ? (
+              <Text variant="callout" color="ink2">{`Spotter costs ${approxMoney(yearlyValueCents(SPOTTER_PRICE_MONTHLY_CENTS), currency)} a year.`}</Text>
+            ) : null}
           </View>
+          <KeptList kept={keptList} />
 
-          <ListRow title="Members to talk to" subtitle="Who to check in with, and ask a coach to do it" chevron onPress={() => router.push('/members')} />
+          <SectionLabel>How it’s worked out</SectionLabel>
           <Text variant="caption" color="ink2" style={styles.foot}>
-            Risk adds up points: sessions falling off (3), no session in 10 days (2), no app open in 7 days (2), a failed payment (2), missed check-ins (1),
-            the first two months (1), plus anything a coach’s athletes shared that needs a check-in. You see that last part as “Their coach has flagged
-            something worth a check-in”: health details stay between the athlete and their coach. 5+ points is high, 3–4 medium.
+            Each signal adds points: sessions falling off (3), no session in 10 days (2), no app open in 7 days (2), a failed payment (2), missed weekly
+            check-ins (1), the first two months (1), plus what a client shared with you: running tired (2), the fuel check (1–2), ongoing pain (2) or no new
+            best in 8 weeks (1). 5+ points is “Needs a check-in soon”, 3–4 “Worth watching”. Clients show up after two weeks with you; paused and
+            cancelled clients don’t count.
+            {solo
+              ? ''
+              : ` For clients an assistant coaches, what they shared stays with that coach; you see “${OWNER_NEUTRAL_REASON}”.`}
           </Text>
         </>
       )}
     </Screen>
+  );
+}
+
+/** Each check-in this year and how it turned out. Moved here from the old Members to talk to screen. */
+function KeptList({ kept }: { kept: ReturnType<typeof useRetentionViews>['kept'] }) {
+  const { viewerId } = useViewerLens();
+  const rows = [...kept.kept, ...kept.pending, ...kept.waiting, ...kept.left];
+  if (!rows.length) {
+    return (
+      <Text color="ink2" style={styles.foot}>
+        When you check in with someone on Needs attention, you’ll see here whether they stayed.
+      </Text>
+    );
+  }
+  const how = (r: KeptRow) => (r.action ? INTERVENTION_DONE_LABEL[r.action] : 'checked in');
+  const who = (r: KeptRow) => (r.coachId === viewerId ? 'You' : r.coachName.split(' ')[0]);
+  const line = (r: KeptRow) => {
+    const by = `${who(r)} ${how(r)} on ${shortDate(r.doneOn ?? r.requestedOn)}`;
+    switch (r.outcome) {
+      case 'kept':
+        return `${by} · still with you`;
+      case 'left':
+        return `${by} · left`;
+      case 'pending': {
+        const at = new Date(Date.parse(`${r.doneOn}T12:00:00Z`) + KEPT_AFTER_DAYS * DAY).toISOString();
+        return `${by} · you’ll know on ${shortDate(at)}`;
+      }
+      default:
+        return `Asked ${r.coachName.split(' ')[0]} on ${shortDate(r.requestedOn)} · not checked in yet`;
+    }
+  };
+  return (
+    <>
+      {rows.map((r, i) => (
+        <ListRow
+          key={r.id}
+          title={r.clientName}
+          subtitle={line(r)}
+          right={
+            r.outcome === 'kept' ? (
+              <Tag label="Kept" tone="success" />
+            ) : r.outcome === 'left' ? (
+              <Tag label="Left" />
+            ) : r.outcome === 'pending' ? (
+              <Tag label="Pending" tone="warning" />
+            ) : (
+              <Tag label="Asked" tone="brand" />
+            )
+          }
+          last={i === rows.length - 1}
+        />
+      ))}
+    </>
   );
 }
 
@@ -118,7 +213,7 @@ function TrendBars({ trend }: { trend: MrrTrend }) {
           style={styles.bars}
           accessible
           accessibilityRole="image"
-          accessibilityLabel={`MRR at risk by week. This week ${approxMoney(last.totalCents ?? 0, trend.currency)}. ${change}`}
+          accessibilityLabel={`Income at risk by week. This week ${approxMoney(last.totalCents ?? 0, trend.currency)}. ${change}`}
         >
           {trend.points.map((p) => (
             <View key={p.weekStart} style={styles.barSlot}>

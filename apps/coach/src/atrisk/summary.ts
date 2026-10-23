@@ -86,3 +86,17 @@ export function whatToAsk(b: BetweenSessions, firstName: string): string[] {
   if (b.progress?.stalled) out.push('Want to chase a different kind of best for a while, like reps at a weight you know?');
   return out.slice(0, 3);
 }
+
+/**
+ * Questions for the engagement reasons on a client's check-in card (sessions, app, payment, weekly
+ * check-ins), in the same plain coach voice. Used after the shared-signal questions, up to three in all.
+ */
+export function whatToAskAboutTraining(reasons: string[]): string[] {
+  const out: string[] = [];
+  if (reasons.some((r) => r.startsWith('Sessions fell') || r.startsWith('No session in')))
+    out.push('What’s got in the way of sessions lately? Want to move them, or make them shorter for a couple of weeks?');
+  if (reasons.some((r) => r.startsWith('Payment failed'))) out.push('Looks like your card didn’t go through. Want me to send the billing link?');
+  if (reasons.some((r) => r.startsWith('Missed '))) out.push('Is the weekly check-in still useful, or would a shorter one suit you better?');
+  if (reasons.some((r) => r.startsWith('Hasn’t opened the app'))) out.push('Is the app still working for you, or would a quick message be easier?');
+  return out;
+}

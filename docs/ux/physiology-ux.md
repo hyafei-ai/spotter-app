@@ -1,13 +1,18 @@
 # Spotter physiology layer — UX review and recommendations
 
 Internal working document (Oct 2026). Produced with the app-ux-improvement method. Personas, journeys and walkthroughs
-are **design hypotheses written by AI, not research findings**. Nothing here has been tested with real athletes,
-coaches or owners yet.
+are **design hypotheses written by AI, not research findings**. Nothing here has been tested with real athletes or
+coaches yet.
+
+> **Correction (Oct 24, 2026, product owner):** there are no gym owners. Spotter is two-sided: the client and the
+> coach, and the coach owns their own coaching business (the tenant "owner" role is the coach). Assistant coaches are
+> an optional team feature. The owner persona is dropped; the coach persona gains the business job. See §3, §5, §6,
+> §9, §13 and [`coach-owner-restructure.md`](coach-owner-restructure.md).
 
 ## 1. Executive summary
 
-Spotter's bet is that one read across training, recovery, fuelling and the menstrual cycle, shared between athlete, coach
-and owner, keeps women 35+ training. The core UX challenge is **trust before insight**: the product asks for the most
+Spotter's bet is that one read across training, recovery, fuelling and the menstrual cycle, shared between athlete and coach,
+keeps women 35+ training. The core UX challenge is **trust before insight**: the product asks for the most
 sensitive data an athlete has (cycle, food, pain) and can only pay it back after weeks of history. So the design strategy
 is:
 
@@ -15,8 +20,9 @@ is:
    from MyMacros and similar, period logs) flows in. Spotter is where the read happens, not another logging app.
 2. **Useful on day one.** Backfill 28 days of Health history at connect, so the brief and baselines work immediately;
    say honestly what still needs time (cycle calibration needs about two cycles).
-3. **One engine, three lenses.** The same read, shown as a daily brief to the athlete, "between sessions" to the coach
-   (only what was shared), and money-and-engagement to the owner (never health).
+3. **One engine, two lenses.** The same read, shown as a daily brief to the athlete and as "between sessions" to the
+   coach (only what was shared). The coach's business view adds money and engagement. In a team, an assistant's
+   client's health detail stays with that assistant.
 4. **Show the evidence.** Every suggestion names its data and how sure it is. No scores to athletes.
 
 Top recommendations, in order: Health connect as onboarding step with a "what we found" preview (R1); the brief as the
@@ -26,29 +32,31 @@ import with dedupe (R5, R6); a watch app focused on the session and the morning 
 ## 2. Product understanding
 
 **Facts provided (by the product owner)**
-- Users: women athletes 35+ (trainees), their coaches/trainers, gym or business owners.
+- Users: women athletes 35+ (trainees) and their coaches/trainers, who own their own coaching business. (Corrected
+  Oct 24: there is no separate gym owner.)
 - Problem framing: under-fuelling (RED-S), cycle-blind programming, accumulated load and injury, stalled raw PRs.
 - Moat as stated: cycle-phase performance calibration (provisional patent in preparation); three-sided architecture;
   cross-domain data engine; switching cost.
-- Planned: a watch app redesigned from the owner's existing one; nutrition and workouts imported via Apple Health so
+- Planned: a watch app redesigned from the product owner's existing one; nutrition and workouts imported via Apple Health so
   clients don't re-enter.
 - Feature names used: retention-intelligence engine, AI Strategy & Stimulus briefs, cycle-aware fuelling.
 
 **Reasonable assumptions**
 - Most athletes in the segment use an iPhone and many an Apple Watch; Android is secondary.
-- Coaches are 1:1 or small-group online/hybrid; owners run a gym or a coaching business with several coaches.
+- Coaches are 1:1 or small-group online/hybrid and run their own business, usually solo; some grow a small team of
+  assistant coaches.
 - Athletes already log food in another app if they log at all.
 
 **Hypotheses to validate**
 - H1: athletes will share cycle phase with a coach if they see exactly what's shared and can stop any time.
 - H2: a calibrated "strongest late-luteal squat yet" keeps motivation when raw PRs stall.
 - H3: coaches act on a between-sessions flag within a day when it comes with "what to ask".
-- H4: owners act on MRR at risk when the reason and the coach to ask are one tap away.
+- H4: coaches act on MRR at risk when the reason and "I checked in" are one tap away from the list.
 
 **Claims to check before using externally**
 - "No commercial fitness app segments baselines by cycle phase": several apps do cycle-related training or nutrition
   guidance (e.g. Wild.AI, FitrWoman; Whoop, Oura, Garmin and Apple have cycle features). The likely-defensible part is
-  *per-athlete performance calibration from the athlete's own lifting data* plus the coach and owner loop. Worth a
+  *per-athlete performance calibration from the athlete's own lifting data* plus the athlete and coach loop. Worth a
   proper competitor and prior-art check alongside the patent filing.
 - Drop-out rate figures in the brief: keep them out of the app UI unless a source is cited.
 
@@ -59,8 +67,7 @@ import with dedupe (R5, R6); a watch app focused on the session and the morning 
 | **The returner** (38–50, back to lifting after kids/career) | Get strong without getting hurt | Trains 3×/wk before work; Apple Watch; logs food on and off | Sore for days, unsure if it's age, cycle or programming | Second injury in a year; a month of no progress | Training 12+ months, knows when to push |
 | **The perimenopause lifter** (44–55) | Understand why sleep and strength changed | Irregular cycle, night sweats; tracks in Apple Health | Apps assume a 28-day cycle or ignore it | App that says "log your period" when there isn't one | Brief that makes sense without a regular cycle |
 | **The under-fueller** (35–45, endurance + lifting) | Perform; often eats "clean" and too little | Runs logged by Watch/Strava, lifts with coach | Fatigue, missed periods, repeat niggles, doesn't connect them | Being told to "eat more" without why | Sees the link, gets a specific fix, maybe sees a dietitian |
-| **The coach** | Not drop the ball between sessions | 15–40 clients, phone first | Finds out about problems at the next session | Another dashboard to check | 30-second prep, flags with "what to ask" |
-| **The owner** | Keep members | Weekly look, desktop | Learns of a cancellation when it happens | Vanity analytics | A name, a reason, a coach to hand it to, and money kept |
+| **The coach** (owns their coaching business; usually solo) | Not drop the ball between sessions, and keep clients and income | 15–40 clients, phone first; a weekly look at the business | Finds out about problems at the next session, and about a cancellation when it happens | Another dashboard to check; vanity analytics | 30-second prep, flags with "what to ask", one tap to log the check-in, and money kept |
 
 ## 4. Jobs to be done (extending docs/jtbd.md)
 
@@ -70,7 +77,8 @@ import with dedupe (R5, R6); a watch app focused on the session and the morning 
 - Athlete, functional: *When I've logged food or a run elsewhere, I want Spotter to already have it, so I don't log twice.*
 - Coach: *Between sessions, I want to see what each athlete chose to share, so I adjust the plan before something breaks.*
 - Coach: *When I write a block, I want to say what each session is for (the stimulus), so the athlete can adjust it sensibly on a bad day.*
-- Owner: *Each week, I want to see who might leave, why (without their health details), what it's worth, and which coach to ask.*
+- Coach (their business): *Each week, I want to see who might leave, why, and what it's worth, check in with them, and later see who stayed.*
+- Coach with a team (optional): *For a client an assistant coaches, I want to ask that coach to check in, without reading the client's health details myself.*
 
 ## 5. Critical tasks
 
@@ -82,7 +90,7 @@ import with dedupe (R5, R6); a watch app focused on the session and the morning 
 | T4 | Athlete | Decide what to share with the coach | Once + any time | Loss of trust; privacy harm | Primary (setup) | 4 |
 | T5 | Coach | Prep and act on a between-sessions flag | Daily | Missed injury/RED-S signs | Primary | 5 |
 | T6 | Athlete | Act on a fuel check result | Weekly | RED-S progression | Secondary | 6 |
-| T7 | Owner | Review MRR at risk and hand to a coach | Weekly | Preventable cancellation | Primary (owner) | 7 |
+| T7 | Coach | Review MRR at risk (Keeping clients), open who needs a check-in, log it | Weekly | Preventable cancellation | Primary (business) | 7 |
 | T8 | Athlete | Log pain / return from a niggle | Occasional | Injury | Exception | 8 |
 
 ## 6. Key journeys (condensed)
@@ -101,9 +109,10 @@ import with dedupe (R5, R6); a watch app focused on the session and the morning 
 Clients → "Needs attention" (3) → client → "Between sessions" (running tired 4 of 7 days; fuel check: worth a look;
 shared) → "What to ask" → message, or adjust the lighter rule → mark handled. Target: under 30 seconds to a decision.
 
-**Owner, Monday (T7)**
-Retention → MRR at risk (per currency) → member row ("Coach flagged something worth a check-in"; "No session in 12
-days") → Hand to coach → 60 days later "Kept: $1,560/yr".
+**Coach, Monday, the business look (T7)**
+Me → Your business → Keeping clients → "≈ $632 a month at risk" → See who needs a check-in → Clients, Needs attention
+(Chris, "Needs a check-in soon", "$160/mo") → Chris → Check in card → message or call → I checked in (call) → 60 days
+later "Kept: $160 a month". Teams only: for a client an assistant coaches, "Ask Leo to check in" on the same card.
 
 ## 7. Flows: current vs recommended
 
@@ -135,7 +144,8 @@ days") → Hand to coach → 60 days later "Kept: $1,560/yr".
 | F5 | Privacy | Sharing settings spread across daily check, cycle, fuel, pain | High | R3: one "Who sees what" panel, linked from each toggle | Proposed |
 | F6 | Calibration | Nothing tells the athlete it's still learning | Medium | R4: "Learning your cycle: 1 of 2 cycles" and what it'll do when ready | Building (cycle build) |
 | F7 | Fuel screen | A missed period during pregnancy or on some contraception would false-flag | High | Mode-aware screen; pregnant/postpartum mode pauses it | Building |
-| F8 | Owner | Risk reasons could leak health information | Critical | Owner view strips health reasons → "coach flagged something" | Building (at-risk build) |
+| F8 | Teams | Risk reasons could leak health information to a coach who isn't the client's | Critical | `reasonsFor`: the client's own coach sees reasons; the head coach sees "their coach flagged something" for an assistant's client only | Done (Oct 24) |
+| F11 | Coach | Three overlapping "who to talk to" lists (Members to talk to, Retention, Needs attention) and an owner wall that assumed a gym owner | High | One list (Needs attention), check-in on client detail, business view on Me | Done (Oct 24) |
 | F9 | Web dashboard | Sidebar cramped at phone width | Medium | Collapse to a top bar ≤640px | Building (at-risk build) |
 | F10 | Coach | Briefs say what's wrong but not what the session is *for* | Medium | R7: Stimulus line per session | Proposed |
 
@@ -145,10 +155,12 @@ Athlete tabs: **Today** (brief → session → due items) · **Train** (program,
 **Fuel** (day totals from Health or Spotter, fuel check; hidden when the module is off) · **Coach** (thread) · **Me**
 (Health connections, Your cycle, Pain, **Who sees what**, settings).
 
-Coach: Clients ("All / Needs attention") → client (Before you talk, Between sessions, Today's brief, Cycle and Fuel if
-shared, Pain, Remember) · Inbox · Programs · Me (owner-only Retention).
+Coach: Clients ("Needs you / All / Needs attention") → client (Before you talk, Needs you, **Check in** or Between
+sessions, This week, Today's brief, Cycle and Fuel if shared, Pain, Remember) · Programs · Grow · Me (**Your
+business**: Keeping clients, Team, Import and export; owner role only).
 
-Owner web: Dashboard → Retention (MRR at risk, members to talk to, kept) · Members · Coaches · Billing.
+Coach web dashboard: Overview · Programs · Grow · Brand · Publish · Team · **Keeping clients** (MRR at risk, who could
+use a check-in, trend, kept) · Import and export. Changed Oct 24: "Members to talk to" merged into Keeping clients.
 
 ## 10. UX writing (key strings)
 
@@ -182,11 +194,11 @@ block or week ("build squat volume; deload week 4"), drafted by AI from the prog
 what it's for ("heavy strength: top sets at RPE 8") so the brief can modify it sensibly ("today keep the top set,
 drop the back-off sets"). The athlete sees only coach-approved text.
 
-**Retention-intelligence engine.** Owner: MRR at risk per currency, trend, top reasons (owner-safe), hand to coach,
-kept value. Coach: the same engine produces "needs a check-in" with physiology reasons the athlete shared. One engine,
-two privacy lenses.
+**Retention-intelligence engine.** One engine, one list: Needs attention, with the physiology reasons the athlete
+shared, and a check-in logged on client detail. The coach's business view adds MRR at risk per currency, the trend and
+kept value. Teams only: a neutral line and "Ask {assistant}" for a client an assistant coaches.
 
-**Apple Watch companion (redesign of the owner's existing app).** Don't port the phone app. Three jobs only:
+**Apple Watch companion (redesign of the product owner's existing app).** Don't port the phone app. Three jobs only:
 1. *Morning glance:* complication + notification with the brief's feel line and one action ("Easier version today").
    Quick 3-tap check-in (energy, soreness, stress) with the crown.
 2. *In session:* current exercise, set n of m, calibrated target load and reps, rest timer with haptic, log reps and RPE
@@ -230,7 +242,8 @@ Act) apply to cycle and food data; get counsel before pooling.
 | R6 | Nutrition from Health, one source per day | Under-fueller | High | M | In build |
 | R7 | Stimulus line per session + coach-approved AI strategy | Coach, athlete | High | M | Proposed (confirm meaning) |
 | R8 | Watch: glance, in-session logging, coach messages | Athletes with Watch | High | L | Needs existing watch code |
-| R9 | Owner MRR at risk with health-free reasons | Owner | High | M | In build |
+| R9 | MRR at risk on the coach's business view; health-free reasons only for a team's head coach | Coach | High | M | Done (Oct 24 restructure) |
+| R12 | One "who to check in with" list; log check-ins on client detail; retire Members to talk to | Coach | High | M | Done (Oct 24) |
 | R10 | Illness / travel mode in the check-in | All athletes | Medium | S | Proposed |
 | R11 | Cohort priors with research consent | All | Medium | L | Proposed (legal review) |
 

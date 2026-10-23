@@ -6,6 +6,7 @@ import { Button, EmptyState, IconButton, ListRow, Monogram, Screen, SectionLabel
 import { tenant } from '../../../src/env';
 import { initials, useCoach } from '../../../src/store';
 import { ClientSections } from '../../../src/ClientSections';
+import { BetweenSessionsSection } from '../../../src/atrisk/BetweenSessionsSection';
 import { PrepCard } from '../../../src/memory/PrepCard';
 import { useMemoryTriage } from '../../../src/memory/useClientMemory';
 import { useCheckInDone } from '../../../src/retention/CheckInDone';
@@ -93,7 +94,7 @@ export default function ClientDetail() {
                 style={{ color: colors.brand }}
                 accessibilityRole="button"
                 onPress={() => {
-                  // The owner asked for a check-in: record how it happened first.
+                  // Teams: the head coach asked for a check-in, so record how it happened first.
                   if (checkIn.ask(c.name, open.items, () => markHandled(c.id))) return;
                   const items = markHandled(c.id);
                   toast({ message: 'Marked handled', actionLabel: 'Undo', onAction: () => restore(items) });
@@ -110,6 +111,8 @@ export default function ClientDetail() {
           ))}
         </>
       ) : null}
+
+      <BetweenSessionsSection clientId={c.id} />
 
       <SectionLabel>This week</SectionLabel>
       <Text style={styles.body}>

@@ -6,7 +6,6 @@ export const NAV: { href: string; label: string }[] = [
   { href: '/dashboard/brand', label: 'Brand' },
   { href: '/dashboard/publish', label: 'Publish' },
   { href: '/dashboard/team', label: 'Team' },
-  { href: '/dashboard/members', label: 'Members to talk to' },
-  { href: '/dashboard/retention', label: 'Retention' },
+  { href: '/dashboard/retention', label: 'Keeping clients' },
   { href: '/dashboard/data', label: 'Import and export' },
 ];

@@ -6,7 +6,7 @@ import { Button, EmptyState, IconButton, ListRow, Monogram, Screen, SectionLabel
 import { initials, useCoach } from '../../src/store';
 import { useRole, useTeam } from '../../src/platform/team';
 
-/** One assistant coach: revenue split and assigned clients; assign more from the owner's list (K-8). */
+/** One assistant coach: revenue split and assigned clients; assign more from the head coach's list (K-8). */
 export default function CoachDetail() {
   const { coachId } = useLocalSearchParams<{ coachId: string }>();
   const { colors } = useTheme();
@@ -25,7 +25,7 @@ export default function CoachDetail() {
     return (
       <Screen>
         <View style={styles.nav}>{back}</View>
-        <EmptyState message={!isOwner ? 'Only the owner manages the team.' : 'This coach isn’t on your team any more.'} actionLabel="Back to team" onAction={() => router.replace('/team')} />
+        <EmptyState message={!isOwner ? 'Only the head coach manages the team.' : 'This coach isn’t on your team any more.'} actionLabel="Back to team" onAction={() => router.replace('/team')} />
       </Screen>
     );
   }

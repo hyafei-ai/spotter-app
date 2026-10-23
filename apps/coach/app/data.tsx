@@ -27,7 +27,7 @@ export default function DataScreen() {
     return (
       <Screen>
         <View style={styles.nav}>{back}</View>
-        <EmptyState message="Only the owner can import or export the business’s data." />
+        <EmptyState message="Only the head coach can import or export the business’s data." />
       </Screen>
     );
   }

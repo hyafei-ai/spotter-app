@@ -7,8 +7,22 @@ import { ReadSection } from './ReadSection';
 import { RememberSection } from './memory/RememberSection';
 import { CycleSection } from './CycleSection';
 import { FuelSection } from './fuel/FuelSection';
-import { BetweenSessionsSection } from './atrisk/BetweenSessionsSection';
 import { PainSection } from './pain/PainSection';
+import { viewerSeesHealth } from '@spotter/core';
+import { useViewerLens } from './atrisk/AtRiskList';
+
+/**
+ * Shared health detail (reads, pain, cycle, fuel) is for the client's own coach only
+ * (docs/physiology.md rule 4). A solo coach always sees it; in a team, the head coach doesn't see it
+ * for an assistant's client, and the check-in card shows the neutral line instead.
+ */
+function healthOnly(Section: React.ComponentType<{ clientId: string }>) {
+  function HealthOnly({ clientId }: { clientId: string }) {
+    const { viewerId, coachOf, solo } = useViewerLens();
+    return viewerSeesHealth(viewerId, { coachId: coachOf[clientId] ?? null }, { solo }) ? <Section clientId={clientId} /> : null;
+  }
+  return HealthOnly;
+}
 
 /**
  * Feature sections on the coach's client detail (K-3): program, check-ins, form checks, nutrition,
@@ -22,12 +36,12 @@ const SECTIONS: React.ComponentType<{ clientId: string }>[] = [
   AiSection,
   NutritionSection,
   CoachSection,
-  ReadSection,
-  PainSection,
+  healthOnly(ReadSection),
+  healthOnly(PainSection),
   RememberSection,
-  CycleSection,
-  FuelSection,
-  BetweenSessionsSection,
+  healthOnly(CycleSection),
+  healthOnly(FuelSection),
+  // Between sessions / the check-in card renders near the top of client detail (app/client/[id]/index.tsx).
 ];
 
 export function ClientSections({ clientId }: { clientId: string }) {
