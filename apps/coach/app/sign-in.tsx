@@ -8,7 +8,7 @@ export default function CoachSignIn() {
   const auth = useAuth();
   useEffect(() => {
     if (auth.status !== 'signedIn') return;
-    void takeReturnTo().then((back) => router.replace(back ?? '/clients'));
+    void takeReturnTo().then((back) => router.replace(back ?? '/today'));
   }, [auth.status]);
   return (
     <SignInScreen

@@ -77,7 +77,7 @@ independent. The thresholds keep weak differences off the screen; they don't pro
 - Read a pattern as a lead for a conversation ("you tend to lift about 5% lower after short nights: does that match how
   it feels?"), not a verdict.
 - Pin what's worth acting on to the client's playbook (`PlaybookEntry { patternId | null, text, pinnedAt, source }`;
-  `pinPattern` makes one from a pattern, `source: 'coach'` for the coach's own notes). UI comes later.
+  `pinPattern` makes one from a pattern, `source: 'coach'` for the coach's own notes). The coach app's client page leads with it ("What works for {first}": Pin, Dismiss, Add your own note; `apps/coach/src/playbook/store.ts`, local until a `playbook_entries` table exists). See `docs/ux/coach-experience.md`.
 - Re-check after a block: patterns move as the client changes.
 
 ## MOCK demo (`packages/core/src/demo/patterns.ts`)

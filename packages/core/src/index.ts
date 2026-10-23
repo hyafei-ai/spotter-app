@@ -36,3 +36,4 @@ export * from './timeline';
 export * from './patterns';
 export * from './masters';
 export * from './sources';
+export * from './coachToday';

@@ -5,6 +5,9 @@ import { Feather } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { buildTriage, reasonText, type ClientTriage } from '@spotter/core';
 import {
+  Button,
+  SegmentedControl,
+  Tag,
   EmptyState,
   IconButton,
   ListRow,
@@ -25,7 +28,11 @@ import { initials, useCoach } from '../../src/store';
 import { tenant } from '../../src/env';
 import { SwipeRow } from '../../src/platform/SwipeRow';
 import { useRole, useVisibleClientIds } from '../../src/platform/team';
-import { requestedClientIds, triageForViewer, useDemoCheckInRequests } from '../../src/retention/store';
+import {
+  requestedClientIds,
+  triageForViewer,
+  useDemoCheckInRequests,
+} from '../../src/retention/store';
 import { useCheckInDone } from '../../src/retention/CheckInDone';
 import { loadCoachData, saveTriage } from '../../src/platform/serverData';
 import { PrepCard } from '../../src/memory/PrepCard';
@@ -33,9 +40,15 @@ import { usePainTriage } from '../../src/pain/PainSection';
 import { useMemoryTriage } from '../../src/memory/useClientMemory';
 import { useFuelTriage } from '../../src/fuel/store';
 import { AtRiskList } from '../../src/atrisk/AtRiskList';
+import { RosterGrid } from '../../src/clients/RosterGrid';
+import { useRoster } from '../../src/today/data';
+import { isWaiting } from '../../src/today/useToday';
+import { isSampleClient } from '@spotter/core/demo';
 
 type Filter = 'needs' | 'all' | 'attention' | 'new' | 'paused' | 'payment';
 const FILTERS: { value: Filter; label: string }[] = [
+  // Waiting on you: messages, form checks, payments, PAR-Q, follow-ups. Body and engagement reasons are on
+  // Today and in Check in only (docs/ux/coach-experience.md), so nothing is said twice.
   { value: 'needs', label: 'Needs you' },
   { value: 'all', label: 'All' },
   // The one "who to check in with" list: reasons from sessions, app use and what each client shared
@@ -50,11 +63,15 @@ const FILTERS: { value: Filter; label: string }[] = [
 export default function Clients() {
   const { colors } = useTheme();
   const toast = useToast();
-  const { clients: allClients, triage: allTriage, markHandled, restore, snooze } = useCoach();
+  const { triage: allTriage, markHandled, restore, snooze } = useCoach();
+  const { clients: rosterClients, firstRun } = useRoster();
+  const [view, setView] = useState<'list' | 'grid'>('list');
   const params = useLocalSearchParams<{ filter?: string }>();
   const fromParam = FILTERS.find((f) => f.value === params.filter)?.value;
-  const [filter, setFilter] = useState<Filter>(fromParam ?? 'needs');
+  const [chosen, setFilter] = useState<Filter>(fromParam ?? 'needs');
   // The tab stays mounted, so a later link with ?filter= switches the chip (adjusting state on a prop change).
+  // First login: only the sample client exists and nothing is waiting, so show everyone.
+  const filter: Filter = firstRun && chosen === 'needs' ? 'all' : chosen;
   const [lastParam, setLastParam] = useState(fromParam);
   if (fromParam !== lastParam) {
     setLastParam(fromParam);
@@ -77,12 +94,19 @@ export default function Clients() {
   const checkIn = useCheckInDone();
   const baseVisible = useVisibleClientIds();
   const visible = useMemo(
-    () => (baseVisible ? new Set([...baseVisible, ...requestedClientIds(allTriage, viewerId)]) : null),
+    () =>
+      baseVisible ? new Set([...baseVisible, ...requestedClientIds(allTriage, viewerId)]) : null,
     [baseVisible, allTriage, viewerId],
   );
-  const clients = useMemo(() => (visible ? allClients.filter((c) => visible.has(c.id)) : allClients), [allClients, visible]);
+  const clients = rosterClients;
   const triage = useMemo(
-    () => triageForViewer(visible ? allTriage.filter((t) => visible.has(t.clientId)) : allTriage, viewerId),
+    () =>
+      triageForViewer(
+        (visible ? allTriage.filter((t) => visible.has(t.clientId)) : allTriage).filter((t) =>
+          isWaiting(t.reason),
+        ),
+        viewerId,
+      ),
     [allTriage, visible, viewerId],
   );
 
@@ -98,7 +122,11 @@ export default function Clients() {
     const ordered =
       filter === 'needs'
         ? rows.map((r) => clients.find((c) => c.id === r.clientId)!).filter(Boolean)
-        : [...clients].sort((a, b) => (byClient.get(b.id)?.priority ?? 0) - (byClient.get(a.id)?.priority ?? 0) || a.name.localeCompare(b.name));
+        : [...clients].sort(
+            (a, b) =>
+              (byClient.get(b.id)?.priority ?? 0) - (byClient.get(a.id)?.priority ?? 0) ||
+              a.name.localeCompare(b.name),
+          );
     return ordered
       .filter((c) => {
         if (filter === 'new') return c.status === 'new';
@@ -117,7 +145,10 @@ export default function Clients() {
     if (
       checkIn.ask(c.name, open, () => {
         const items = markHandled(c.id);
-        void saveTriage(items.map((i) => i.id).filter((id) => !id.startsWith('req-')), { handled_at: new Date().toISOString(), handled_by: getAuth().userId });
+        void saveTriage(
+          items.map((i) => i.id).filter((id) => !id.startsWith('req-')),
+          { handled_at: new Date().toISOString(), handled_by: getAuth().userId },
+        );
       })
     ) {
       setActionsFor(null);
@@ -128,7 +159,7 @@ export default function Clients() {
     const ids = items.map((i) => i.id);
     void saveTriage(ids, { handled_at: new Date().toISOString(), handled_by: getAuth().userId });
     toast({
-      message: `${c.name.split(' ')[0]} marked handled`,
+      message: `${c.name.split(' ')[0]}: done`,
       actionLabel: 'Undo',
       onAction: () => {
         restore(items);
@@ -156,33 +187,78 @@ export default function Clients() {
     <Screen scroll={false}>
       <ScreenHeader
         title="Clients"
-        subtitle={needCount ? `${needCount} need you today` : 'Nobody needs you right now'}
-        right={<IconButton icon="user-plus" label="Invite a client" onPress={() => router.push('/invite')} />}
+        subtitle={
+          firstRun
+            ? 'Your sample client is here until you invite someone'
+            : needCount
+              ? `${needCount} with something waiting on you`
+              : 'Nothing waiting on you'
+        }
+        right={
+          <IconButton
+            icon="user-plus"
+            label="Invite a client"
+            onPress={() => router.push('/invite')}
+          />
+        }
       />
       <View style={styles.search}>
-        <TextField label="Search clients" value={query} onChangeText={setQuery} placeholder="Name" autoCorrect={false} returnKeyType="search" />
+        <View style={{ flex: 1 }}>
+          <TextField
+            label="Search clients"
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Name"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+        </View>
+        <View style={{ width: 128 }}>
+          <SegmentedControl
+            label="Show clients as"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'list', label: 'List' },
+              { value: 'grid', label: 'Grid' },
+            ]}
+          />
+        </View>
       </View>
-      <View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityRole="tablist">
-          {FILTERS.map((f) => {
-            const on = f.value === filter;
-            return (
-              <Pressable
-                key={f.value}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: on }}
-                onPress={() => setFilter(f.value)}
-                style={[styles.chip, { borderColor: on ? colors.ink : colors.line, backgroundColor: on ? colors.ink : 'transparent' }]}
-              >
-                <Text variant="bodyStrong" style={{ color: on ? colors.paper : colors.ink }}>
-                  {f.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-      {filter !== 'attention' && list.length > 1 ? (
+      {view === 'list' && !firstRun ? (
+        <View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chips}
+            accessibilityRole="tablist"
+          >
+            {FILTERS.map((f) => {
+              const on = f.value === filter;
+              return (
+                <Pressable
+                  key={f.value}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: on }}
+                  onPress={() => setFilter(f.value)}
+                  style={[
+                    styles.chip,
+                    {
+                      borderColor: on ? colors.ink : colors.line,
+                      backgroundColor: on ? colors.ink : 'transparent',
+                    },
+                  ]}
+                >
+                  <Text variant="bodyStrong" style={{ color: on ? colors.paper : colors.ink }}>
+                    {f.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
+      {view === 'list' && filter !== 'attention' && list.length > 1 ? (
         <Pressable
           accessibilityRole="button"
           onPress={() =>
@@ -199,13 +275,23 @@ export default function Clients() {
           </Text>
         </Pressable>
       ) : null}
-      {filter === 'attention' && clients.length > 0 ? (
+      {view === 'grid' ? (
+        <RosterGrid clients={clients.filter((c) => !q || c.name.toLowerCase().includes(q))} />
+      ) : filter === 'attention' && clients.length > 0 ? (
         <AtRiskList visibleIds={clients.map((c) => c.id)} query={query} />
       ) : clients.length === 0 ? (
-        <EmptyState message="No clients yet. Send your first invite and they’ll show up here." actionLabel="Invite a client" onAction={() => router.push('/invite')} />
+        <EmptyState
+          message="No clients yet. Send your first invite and they’ll show up here."
+          actionLabel="Invite a client"
+          onAction={() => router.push('/invite')}
+        />
       ) : list.length === 0 ? (
         <EmptyState
-          message={filter === 'needs' && !q ? 'All clear. Nobody needs you right now.' : 'No clients match.'}
+          message={
+            filter === 'needs' && !q
+              ? 'All clear. Nobody needs you right now.'
+              : 'No clients match.'
+          }
           actionLabel={filter !== 'all' ? 'Show all clients' : undefined}
           onAction={() => {
             setFilter('all');
@@ -222,12 +308,29 @@ export default function Clients() {
             const c = item.client;
             return (
               <SwipeRow
-                left={[{ label: 'Reply', icon: 'message-square', tone: 'brand', onPress: () => router.push(`/client/${c.id}/thread`) }]}
+                left={[
+                  {
+                    label: 'Reply',
+                    icon: 'message-square',
+                    tone: 'brand',
+                    onPress: () => router.push(`/client/${c.id}/thread`),
+                  },
+                ]}
                 right={
                   t
                     ? [
-                        { label: 'Snooze', icon: 'clock', tone: 'ink', onPress: () => snoozeFor(c, 1, 'Tomorrow') },
-                        { label: 'Handled', icon: 'check', tone: 'success', onPress: () => handled(c) },
+                        {
+                          label: 'Snooze',
+                          icon: 'clock',
+                          tone: 'ink',
+                          onPress: () => snoozeFor(c, 1, 'Tomorrow'),
+                        },
+                        {
+                          label: 'Done',
+                          icon: 'check',
+                          tone: 'success',
+                          onPress: () => handled(c),
+                        },
                       ]
                     : undefined
                 }
@@ -236,11 +339,21 @@ export default function Clients() {
                   <ListRow
                     left={<Monogram initials={initials(c.name)} size={40} />}
                     title={c.name}
+                    right={
+                      isSampleClient(c.id) ? (
+                        <Tag label="Sample" />
+                      ) : (
+                        <IconButton
+                          icon="more-horizontal"
+                          label={`Actions for ${c.name}`}
+                          onPress={() => setActionsFor(c)}
+                        />
+                      )
+                    }
                     reason={t ? reasonText(t.top) : undefined}
                     subtitle={`${more}${c.status === 'paused' ? 'Paused · ' : ''}${c.plan}`}
                     onPress={() => router.push(`/client/${c.id}`)}
-                    accessibilityHint="Swipe right to reply, left to mark handled or snooze. Actions are also in the more button."
-                    right={<IconButton icon="more-horizontal" label={`Actions for ${c.name}`} onPress={() => setActionsFor(c)} />}
+                    accessibilityHint="Swipe right to reply, left for Done or snooze. Actions are also in the more button."
                     last={index === list.length - 1}
                   />
                 </View>
@@ -249,8 +362,21 @@ export default function Clients() {
           }}
         />
       )}
+      {firstRun ? (
+        <View style={{ paddingHorizontal: margin, paddingBottom: space[6] }}>
+          <Button
+            label="Invite your first client"
+            icon="user-plus"
+            onPress={() => router.push('/invite')}
+          />
+        </View>
+      ) : null}
 
-      <Sheet visible={!!actionsFor} title={actionsFor?.name ?? ''} onClose={() => setActionsFor(null)}>
+      <Sheet
+        visible={!!actionsFor}
+        title={actionsFor?.name ?? ''}
+        onClose={() => setActionsFor(null)}
+      >
         {actionsFor ? (
           <>
             <ListRow
@@ -274,16 +400,34 @@ export default function Clients() {
             />
             {byClient.has(actionsFor.id) ? (
               <>
-                <ListRow title="Mark handled" left={<Feather name="check" size={20} color={colors.ink2} />} onPress={() => handled(actionsFor)} />
-                <ListRow title="Snooze until tomorrow" left={<Feather name="clock" size={20} color={colors.ink2} />} onPress={() => snoozeFor(actionsFor, 1, 'Tomorrow')} />
-                <ListRow title="Snooze for a week" left={<Feather name="calendar" size={20} color={colors.ink2} />} last onPress={() => snoozeFor(actionsFor, 7, 'Next week')} />
+                <ListRow
+                  title="Done"
+                  subtitle="Clears what’s waiting on you"
+                  left={<Feather name="check" size={20} color={colors.ink2} />}
+                  onPress={() => handled(actionsFor)}
+                />
+                <ListRow
+                  title="Snooze until tomorrow"
+                  left={<Feather name="clock" size={20} color={colors.ink2} />}
+                  onPress={() => snoozeFor(actionsFor, 1, 'Tomorrow')}
+                />
+                <ListRow
+                  title="Snooze for a week"
+                  left={<Feather name="calendar" size={20} color={colors.ink2} />}
+                  last
+                  onPress={() => snoozeFor(actionsFor, 7, 'Next week')}
+                />
               </>
             ) : null}
           </>
         ) : null}
       </Sheet>
 
-      <Sheet visible={!!prepFor} title={prepFor ? `Prep: ${prepFor.name}` : ''} onClose={() => setPrepFor(null)}>
+      <Sheet
+        visible={!!prepFor}
+        title={prepFor ? `Prep: ${prepFor.name}` : ''}
+        onClose={() => setPrepFor(null)}
+      >
         {prepFor ? (
           <View style={styles.prep}>
             <PrepCard clientId={prepFor.id} inset={false} />
@@ -306,9 +450,28 @@ export default function Clients() {
 }
 
 const styles = StyleSheet.create({
-  search: { paddingHorizontal: margin, paddingBottom: space[3] },
+  search: {
+    paddingHorizontal: margin,
+    paddingBottom: space[3],
+    flexDirection: 'row',
+    gap: space[3],
+    alignItems: 'flex-end',
+  },
   chips: { paddingHorizontal: margin, gap: space[2], paddingBottom: space[3] },
-  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: space[4], minHeight: 44, justifyContent: 'center' },
+  chip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: space[4],
+    minHeight: 44,
+    justifyContent: 'center',
+  },
   prep: { paddingHorizontal: margin, gap: space[2] },
-  bulk: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingHorizontal: margin, minHeight: 44, alignSelf: 'flex-start' },
+  bulk: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingHorizontal: margin,
+    minHeight: 44,
+    alignSelf: 'flex-start',
+  },
 });

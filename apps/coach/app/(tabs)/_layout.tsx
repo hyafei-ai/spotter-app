@@ -21,10 +21,18 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 12, lineHeight: 16 },
       }}
     >
+      <Tabs.Screen name="today" options={{ title: 'Today', tabBarIcon: icon('sun') }} />
       <Tabs.Screen name="clients" options={{ title: 'Clients', tabBarIcon: icon('users') }} />
       <Tabs.Screen name="programs" options={{ title: 'Programs', tabBarIcon: icon('clipboard') }} />
       {/* Grow is payments and sales: owner-only, hidden (not disabled) for assistant coaches (UX M1). */}
-      <Tabs.Screen name="grow" options={{ title: 'Grow', tabBarIcon: icon('trending-up'), href: isOwner ? undefined : null }} />
+      <Tabs.Screen
+        name="grow"
+        options={{
+          title: 'Grow',
+          tabBarIcon: icon('trending-up'),
+          href: isOwner ? undefined : null,
+        }}
+      />
       <Tabs.Screen name="me" options={{ title: 'Me', tabBarIcon: icon('user') }} />
     </Tabs>
   );

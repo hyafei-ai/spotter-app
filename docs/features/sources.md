@@ -19,6 +19,12 @@ app or API offers is marked *to verify*: check the vendor's current documentatio
 Both adapters are thin: the client app already maps the store's records into Spotter's shapes; the core adapter keeps
 only that store's rows, so HRV methods never mix.
 
+**How far back a new client's history goes (to verify).** The coach app's "connected" state and the invite screen
+promise only "the history their health app shares", never a number of months. Apple Health lets an app read what
+the phone has stored once the person grants access. Health Connect is understood to limit apps to recent data
+(around 30 days) unless a separate history permission is granted, and the rules differ by Android version: verify on
+devices before any copy names a depth.
+
 Any device whose companion app writes to Apple Health or Health Connect reaches Spotter this way with no extra work.
 Whether a given device does, and which data types it writes, is *to verify* per vendor and platform:
 

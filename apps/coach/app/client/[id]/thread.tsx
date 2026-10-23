@@ -2,13 +2,36 @@ import { useCallback, useEffect, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { IconButton, ListRow, Screen, SectionLabel, Sheet, Text, TextField, useTheme, useToast, margin, space } from '@spotter/ui';
-import { MessageBubble, VoiceRecorder, isConfigured, supabase, useAuth, useThreadRealtime, type RealtimeMessageRow } from '@spotter/ui/platform';
+import {
+  IconButton,
+  ListRow,
+  Screen,
+  SectionLabel,
+  Sheet,
+  Text,
+  TextField,
+  useTheme,
+  useToast,
+  margin,
+  space,
+} from '@spotter/ui';
+import {
+  MessageBubble,
+  VoiceRecorder,
+  isConfigured,
+  supabase,
+  useAuth,
+  useThreadRealtime,
+  type RealtimeMessageRow,
+} from '@spotter/ui/platform';
 import { tenant } from '../../../src/env';
 import { useCoach } from '../../../src/store';
 import { useInbox, type CoachMessage } from '../../../src/platform/inbox';
 import { FollowUpSheet } from '../../../src/memory/FollowUpSheet';
 import { useMemoryLoaded } from '../../../src/memory/store';
+import { useTodayDone } from '../../../src/today/store';
+import { usePlanValues, useViewerLens } from '../../../src/atrisk/AtRiskList';
+import { useRetention } from '../../../src/retention/store';
 
 // Stable empty list: a fresh [] from the selector would re-render forever (React #185).
 const NO_MESSAGES: CoachMessage[] = [];
@@ -18,7 +41,14 @@ const NO_MESSAGES: CoachMessage[] = [];
  * with read receipts and a typing indicator over realtime in connected builds.
  */
 export default function Thread() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // From Today: `draft` prefills the message; `done` marks the Today item done once sent; `checkin` also
+  // logs the check-in by message (docs/ux/coach-experience.md: one way to close a check-in).
+  const {
+    id,
+    draft: prefill,
+    done,
+    checkin,
+  } = useLocalSearchParams<{ id: string; draft?: string; done?: string; checkin?: string }>();
   const { colors } = useTheme();
   const toast = useToast();
   const auth = useAuth();
@@ -26,7 +56,12 @@ export default function Thread() {
   const msgs = useInbox((s) => s.threads[id ?? ''] ?? NO_MESSAGES);
   const send = useInbox((s) => s.send);
   const replies = useInbox((s) => s.savedReplies);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(prefill ?? '');
+  const [closes, setCloses] = useState<{ done?: string; checkin?: string }>({ done, checkin });
+  const markDone = useTodayDone((s) => s.markDone);
+  const lens = useViewerLens();
+  const { monthlyOf } = usePlanValues();
+  const logCheckIn = useRetention((s) => s.logCheckIn);
   const [sheet, setSheet] = useState<'attach' | 'replies' | 'remind' | null>(null);
   const [recording, setRecording] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -37,11 +72,26 @@ export default function Thread() {
   useEffect(() => {
     if (!isConfigured() || !supabase || auth.status !== 'signedIn' || !id) return;
     void (async () => {
-      const { data: th } = await supabase.from('threads').select('id').eq('tenant_id', tenant.id).eq('client_id', id).maybeSingle();
+      const { data: th } = await supabase
+        .from('threads')
+        .select('id')
+        .eq('tenant_id', tenant.id)
+        .eq('client_id', id)
+        .maybeSingle();
       if (!th) return;
       setThreadId(th.id);
-      const { data } = await supabase.from('messages').select('*').eq('thread_id', th.id).order('sent_at').limit(200);
-      useInbox.setState({ threads: { ...useInbox.getState().threads, [id]: (data ?? []).map((r) => toCoachMessage(r as RealtimeMessageRow, auth.userId)) } });
+      const { data } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('thread_id', th.id)
+        .order('sent_at')
+        .limit(200);
+      useInbox.setState({
+        threads: {
+          ...useInbox.getState().threads,
+          [id]: (data ?? []).map((r) => toCoachMessage(r as RealtimeMessageRow, auth.userId)),
+        },
+      });
       await supabase.rpc('mark_thread_read', { thread: th.id, up_to: new Date().toISOString() });
     })();
   }, [id, auth.status, auth.userId]);
@@ -51,7 +101,9 @@ export default function Thread() {
       if (!id) return;
       const list = useInbox.getState().threads[id] ?? [];
       const m = toCoachMessage(row, auth.userId);
-      const next = list.some((x) => x.id === m.id) ? list.map((x) => (x.id === m.id ? { ...x, readAt: m.readAt } : x)) : [...list, m];
+      const next = list.some((x) => x.id === m.id)
+        ? list.map((x) => (x.id === m.id ? { ...x, readAt: m.readAt } : x))
+        : [...list, m];
       useInbox.setState({ threads: { ...useInbox.getState().threads, [id]: next } });
     },
     [id, auth.userId],
@@ -61,8 +113,10 @@ export default function Thread() {
   const deliver = async (m: Omit<CoachMessage, 'id' | 'mine' | 'sentAt' | 'readAt'>) => {
     try {
       await send(id!, m);
+      return true;
     } catch (e) {
       toast({ message: e instanceof Error ? e.message : 'Couldn’t send. Try again.' });
+      return false;
     }
   };
 
@@ -70,15 +124,44 @@ export default function Thread() {
     const body = draft.trim();
     if (!body) return;
     setDraft('');
-    void deliver({ kind: 'text', body, mediaUri: null, durationMs: null });
+    void deliver({ kind: 'text', body, mediaUri: null, durationMs: null }).then(
+      (ok) => ok && closeLoop(),
+    );
+  };
+
+  // The first message sent from a Today item closes it, and a Check in item is recorded as a check-in.
+  const closeLoop = () => {
+    if (!closes.done && !closes.checkin) return;
+    const { done: key, checkin: reason } = closes;
+    setCloses({});
+    if (reason && c && lens.viewer) {
+      void logCheckIn(
+        { clientId: c.id, name: c.name, monthlyCents: monthlyOf(c.id) },
+        { id: lens.viewer.id, name: lens.viewer.name },
+        reason,
+        'message',
+        null,
+      )
+        .then(() => {
+          if (key) markDone(key, 'Messaged · check-in logged');
+          toast({
+            message: `Check-in with ${first} logged. You’ll see on Keeping clients whether it helped.`,
+          });
+        })
+        .catch(() =>
+          toast({ message: 'Sent, but the check-in didn’t save. Log it from their page.' }),
+        );
+    } else if (key) markDone(key, 'Sent');
   };
 
   const pickPhoto = async () => {
     setSheet(null);
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return toast({ message: 'Photo access is off. Turn it on in Settings to send photos.' });
+    if (!perm.granted)
+      return toast({ message: 'Photo access is off. Turn it on in Settings to send photos.' });
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
-    if (!res.canceled && res.assets[0]) void deliver({ kind: 'image', body: '', mediaUri: res.assets[0].uri, durationMs: null });
+    if (!res.canceled && res.assets[0])
+      void deliver({ kind: 'image', body: '', mediaUri: res.assets[0].uri, durationMs: null });
   };
 
   const lastMine = [...msgs].reverse().find((m) => m.mine);
@@ -96,7 +179,11 @@ export default function Thread() {
           />
         ) : (
           <View style={styles.composer}>
-            <IconButton icon="plus" label="Attach a voice note, photo or saved reply" onPress={() => setSheet('attach')} />
+            <IconButton
+              icon="plus"
+              label="Attach a voice note, photo or saved reply"
+              onPress={() => setSheet('attach')}
+            />
             <View style={{ flex: 1 }}>
               <TextField
                 label={`Message ${first}`}
@@ -114,7 +201,11 @@ export default function Thread() {
       }
     >
       <View style={[styles.head, { borderBottomColor: colors.line }]}>
-        <IconButton icon="arrow-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/clients'))} />
+        <IconButton
+          icon="arrow-left"
+          label="Back"
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/clients'))}
+        />
         <View>
           <Text variant="headline" accessibilityRole="header">
             {c?.name ?? 'Thread'}
@@ -126,7 +217,11 @@ export default function Thread() {
           ) : null}
         </View>
         <View style={{ flex: 1 }} />
-        <IconButton icon="bell" label={`Remind me to follow up with ${first}`} onPress={() => setSheet('remind')} />
+        <IconButton
+          icon="bell"
+          label={`Remind me to follow up with ${first}`}
+          onPress={() => setSheet('remind')}
+        />
       </View>
       {msgs.length === 0 ? (
         <Text color="ink2" style={{ padding: margin }}>
@@ -156,7 +251,12 @@ export default function Thread() {
         />
       )}
 
-      <FollowUpSheet clientId={id ?? ''} firstName={first} visible={sheet === 'remind'} onClose={() => setSheet(null)} />
+      <FollowUpSheet
+        clientId={id ?? ''}
+        firstName={first}
+        visible={sheet === 'remind'}
+        onClose={() => setSheet(null)}
+      />
       <Sheet visible={sheet === 'attach'} title="Send" onClose={() => setSheet(null)}>
         <ListRow
           title="Voice note"
@@ -167,7 +267,12 @@ export default function Thread() {
           }}
         />
         <ListRow title="Photo" subtitle="From your library" onPress={() => void pickPhoto()} />
-        <ListRow title="Saved reply" subtitle={replies.length ? `${replies.length} saved` : 'None yet'} last onPress={() => setSheet('replies')} />
+        <ListRow
+          title="Saved reply"
+          subtitle={replies.length ? `${replies.length} saved` : 'None yet'}
+          last
+          onPress={() => setSheet('replies')}
+        />
       </Sheet>
       <Sheet visible={sheet === 'replies'} title="Saved replies" onClose={() => setSheet(null)}>
         {replies.length === 0 ? (
@@ -211,6 +316,13 @@ function toCoachMessage(r: RealtimeMessageRow, selfId: string | null): CoachMess
 }
 
 const styles = StyleSheet.create({
-  head: { flexDirection: 'row', alignItems: 'center', gap: space[1], paddingHorizontal: space[2], paddingVertical: space[2], borderBottomWidth: StyleSheet.hairlineWidth },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[1],
+    paddingHorizontal: space[2],
+    paddingVertical: space[2],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: space[1] },
 });

@@ -175,3 +175,5 @@ Issue 1 resolved: the "Needs attention" filter is renamed **Check in**. "Needs y
 coach (messages, form checks, payments, follow-ups); "Check in" is who could use a conversation. The same three words
 (Act today / Check in / Celebrate) will group the coach's Today home (`docs/ux/first-value.md`). Issues 2 and 3
 (repeated facts; two ways to close the loop) are folded into that home rebuild.
+
+Issues 2 and 3 are resolved in `docs/ux/coach-experience.md` (Oct 2026): Needs you now holds waiting items only (closed with **Done**), body and engagement reasons live on Today and Check in only, and a check-in closes by being recorded (message from Today, or I checked in).

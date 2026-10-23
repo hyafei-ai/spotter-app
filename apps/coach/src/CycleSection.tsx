@@ -11,7 +11,7 @@ import { tenant } from './env';
  * and the calibration summary. Real builds call cycle_shared_for_coach(client), which returns nothing
  * unless sharing is on. MOCK: the demo client app writes the same projection to `spotter.cycle.<tenant>`.
  */
-function useSharedCycle(clientId: string): { loaded: boolean; cycle: SharedCycle | null } {
+export function useSharedCycle(clientId: string): { loaded: boolean; cycle: SharedCycle | null } {
   const [state, setState] = useState<{ loaded: boolean; cycle: SharedCycle | null }>({ loaded: false, cycle: null });
   useEffect(() => {
     let live = true;
