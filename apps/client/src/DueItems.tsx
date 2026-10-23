@@ -4,6 +4,7 @@ import type { ModuleKey } from '@spotter/core';
 import { SectionLabel } from '@spotter/ui';
 import { CheckInDueRow, FormCheckReplyRow, FormCheckRequestRow } from './formchecks/DueRows';
 import { NutritionDueRow } from './nutrition/DueRow';
+import { FuelDueRow } from './fuel/FuelRows';
 import { isOn } from './modules';
 
 /**
@@ -16,6 +17,7 @@ const DUE_ROWS: { key: string; modules: ModuleKey[]; Row: React.ComponentType }[
   { key: 'formcheck-request', modules: ['formChecks'], Row: FormCheckRequestRow },
   { key: 'formcheck-reply', modules: ['formChecks'], Row: FormCheckReplyRow },
   { key: 'nutrition', modules: ['nutrition', 'habits'], Row: NutritionDueRow },
+  { key: 'fuel', modules: ['nutrition'], Row: FuelDueRow },
 ];
 
 const DueContext = createContext<(key: string, visible: boolean) => void>(() => {});
