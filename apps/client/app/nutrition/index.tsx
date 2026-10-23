@@ -100,7 +100,18 @@ export default function Nutrition() {
           {`Training day: target +${kcal(trainingDayTargetKcal(setup.targets.macros.kcal, fuel.trainingKcal) - setup.targets.macros.kcal)} (estimated for ${fuel.finished ? 'the session you did' : 'today’s session'})`}
         </Text>
       ) : null}
-      {mode === 'macros' && setup.targets.macros ? (
+      {mode !== 'off' && fuel.waiting ? (
+        <View style={[styles.summary, { gap: space[1] }]} accessibilityLiveRegion="polite">
+          <Text variant="bodyStrong">{`Waiting for ${fuel.waiting.app}`}</Text>
+          <Text variant="callout" color="ink2">
+            {`${fuel.waiting.app} hasn’t written today’s food to ${fuel.waiting.provider} yet. It shows here once it does, usually soon after you log a meal there. No need to log it twice.`}
+          </Text>
+          {mode === 'macros' && setup.targets.macros ? (
+            <Text variant="caption" color="ink2">{`Today’s target: ${kcal(trainingDayTargetKcal(setup.targets.macros.kcal, fuel.trainingKcal))}`}</Text>
+          ) : null}
+        </View>
+      ) : null}
+      {mode === 'macros' && setup.targets.macros && !fuel.waiting ? (
         <MacroSummary
           logged={fuel.health?.macros ?? sumMacros(day)}
           target={{ ...setup.targets.macros, kcal: trainingDayTargetKcal(setup.targets.macros.kcal, fuel.trainingKcal) }}
@@ -128,7 +139,7 @@ export default function Nutrition() {
 function useTrainingDayAndHealth(date: string, today: string, day: FoodLogEntry[]) {
   const intakeSource = useFuel((s) => s.settings.intakeSource);
   const bodyweightKg = useFuel((s) => s.bodyweightKg);
-  const { days } = useHealthIntake();
+  const { days, connected } = useHealthIntake();
   const completed = useApp((s) => s.completed);
   const todayMode = useApp((s) => s.demo.todayMode);
   return useMemo(() => {
@@ -151,8 +162,15 @@ function useTrainingDayAndHealth(date: string, today: string, day: FoodLogEntry[
         trainingKcal = sessionKcalFor(null, null, bodyweightKg);
       }
     }
-    return { health, trainingKcal, finished };
-  }, [days, date, today, day, intakeSource, bodyweightKg, completed, todayMode]);
+    // Food comes from another app via the health store, but that app hasn't written this day yet: say so
+    // instead of showing "0 kcal" as if nothing was eaten.
+    const knownApp = [...days].reverse().find((d) => d.sources.length)?.sources[0] ?? null;
+    const waiting =
+      !health && connected && intakeSource !== 'spotter' && knownApp && date === today && spotterDay(day, date) == null
+        ? { app: knownApp, provider: healthProvider() }
+        : null;
+    return { health, trainingKcal, finished, waiting };
+  }, [days, connected, date, today, day, intakeSource, bodyweightKg, completed, todayMode]);
 }
 
 function HealthTotals({ label, app, kcalTotal }: { label: string; app: string; kcalTotal: number }) {

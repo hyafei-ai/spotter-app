@@ -28,19 +28,19 @@ export const painLabel = (l: Pick<PainLog, 'region' | 'side' | 'level'>) =>
  * "Something hurting?" in the daily check: region, side, 0–10 and a note, saved as a pain log straight
  * away (independent of the rest of the check). Shared with the coach by default, per log.
  */
-export function PainCheck() {
+export function PainCheck({ startOpen = false, bare = false, onSaved }: { startOpen?: boolean; bare?: boolean; onSaved?: () => void } = {}) {
   const { colors } = useTheme();
   const logs = useInjury((s) => s.logs);
   const log = useInjury((s) => s.log);
   const first = tenant.coach.name.split(' ')[0] ?? '';
   const today = localDate();
   const todays = logs.filter((l) => l.date === today);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [region, setRegion] = useState<BodyRegion | null>(null);
   const [side, setSide] = useState<SideValue>('none');
   const [level, setLevel] = useState(3);
   const [note, setNote] = useState('');
-  const [share, setShare] = useState(true);
+  const [share, setShare] = useState(() => useInjury.getState().shareDefault);
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -50,7 +50,8 @@ export function PainCheck() {
       await log({ region, side: side === 'none' ? null : side, level, note: note.trim() ? note.trim().slice(0, 300) : null, shareWithCoach: share });
       setRegion(null);
       setNote('');
-      setOpen(false);
+      setOpen(startOpen);
+      onSaved?.();
     } finally {
       setSaving(false);
     }
@@ -58,11 +59,13 @@ export function PainCheck() {
 
   return (
     <View style={{ gap: space[3] }}>
-      <Pressable onPress={() => setOpen((o) => !o)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={[styles.disclosure, { minHeight: touchMin }]}>
-        <Text style={{ flex: 1 }}>Something hurting?</Text>
-        <Feather name={open ? 'chevron-up' : 'chevron-down'} size={20} color={colors.ink2} />
-      </Pressable>
-      {todays.map((l) => (
+      {bare ? null : (
+        <Pressable onPress={() => setOpen((o) => !o)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={[styles.disclosure, { minHeight: touchMin }]}>
+          <Text style={{ flex: 1 }}>Something hurting?</Text>
+          <Feather name={open ? 'chevron-up' : 'chevron-down'} size={20} color={colors.ink2} />
+        </Pressable>
+      )}
+      {bare ? null : todays.map((l) => (
         <View key={l.id} style={{ gap: 2 }}>
           <Text variant="callout">{`Logged today: ${painLabel(l)}`}</Text>
           <Text variant="caption" color="ink2">
@@ -72,9 +75,11 @@ export function PainCheck() {
       ))}
       {open ? (
         <>
-          <Text variant="label" color="ink2">
-            Where
-          </Text>
+          {bare ? null : (
+            <Text variant="label" color="ink2">
+              Where
+            </Text>
+          )}
           {REGION_ROWS.map((row, i) => (
             <SegmentedControl
               key={i}
@@ -93,7 +98,7 @@ export function PainCheck() {
               <Text variant="caption" color="ink2">
                 {share ? `${first} sees where, how much and your note, so the program can work around it.` : `Kept private. ${first} won’t see this log.`}
               </Text>
-              <Button label="Log it" kind="secondary" loading={saving} onPress={() => void save()} />
+              <Button label="Log it" kind={bare ? 'primary' : 'secondary'} loading={saving} onPress={() => void save()} />
             </>
           ) : null}
           <Text variant="caption" color="ink2">

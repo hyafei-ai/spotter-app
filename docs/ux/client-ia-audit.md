@@ -78,5 +78,5 @@ Keep `docs/design/art-direction.md`, but push it:
 - generous spacing, fewer grey caps headers.
 
 ## Status
-Proposed. Built after the two-sided restructure and the pattern engine merge, then walked through again with
-screenshots (light and dark) per CLAUDE.md.
+Built (Oct 2026, branch feat/client-experience). The before/after record, screenshots, timed walkthrough and
+scorecard are in `docs/ux/client-experience.md`.

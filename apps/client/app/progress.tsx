@@ -1,11 +1,26 @@
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { consistencyText, trendText, type E1rmTrend } from '@spotter/core';
-import { EmptyState, IconButton, ListRow, Screen, SectionLabel, Text, useTheme, margin, radius, space } from '@spotter/ui';
+import { EmptyState, IconButton, ListRow, MiniBars, MiniSpark, Screen, SectionLabel, Text, margin, space } from '@spotter/ui';
 import { shortDate } from '../src/format';
 import { useProgress } from '../src/brief/progress';
+import { useWins } from '../src/wins/useWins';
 
-const KIND_LABEL = { raw_best: 'Best yet', phase_best: 'Best in this phase', rep_best: 'Rep best' } as const;
+const KIND_LABEL = {
+  raw_best: 'Best yet',
+  phase_best: 'Best in this phase',
+  rep_best: 'Rep best',
+  era_best: 'Best in a while',
+  holding_strong: 'Strength held',
+  volume_week: 'Biggest week',
+  session_sets: 'Most work',
+  density: 'Faster',
+  capability_reached: 'Goal reached',
+  capability_best: 'Goal best',
+  resting_hr: 'From your watch',
+  hrv_baseline: 'From your watch',
+  sleep_regularity: 'From your watch',
+} as const;
 
 /**
  * Progress beyond raw PRs (docs/features/brief.md): rep bests at a weight, estimated-max trend, bests
@@ -13,9 +28,10 @@ const KIND_LABEL = { raw_best: 'Best yet', phase_best: 'Best in this phase', rep
  * Everything here comes from logged sets; nothing is rounded up.
  */
 export default function Progress() {
-  const { wins, trends, consistency, phaseAware } = useProgress();
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/me'));
-  const empty = wins.length === 0 && trends.length === 0 && consistency.done === 0;
+  const { trends, consistency, phaseAware } = useProgress();
+  const allWins = useWins();
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/train'));
+  const empty = allWins.length === 0 && trends.length === 0 && consistency.done === 0;
 
   return (
     <Screen>
@@ -26,7 +42,7 @@ export default function Progress() {
         <Text variant="title" accessibilityRole="header">
           Progress
         </Text>
-        <Text color="ink2">More than one-rep maxes: reps, trends and showing up.</Text>
+        <Text color="ink2">More than one-rep maxes: reps, strength held, trends and showing up. Tap share on a win to post it.</Text>
       </View>
       {empty ? (
         <EmptyState message="Log a few sessions and your progress shows up here." actionLabel="Go to Today" onAction={() => router.push('/today')} />
@@ -35,15 +51,29 @@ export default function Progress() {
           <SectionLabel>Consistency</SectionLabel>
           <View style={styles.body}>
             <Text variant="callout">{consistencyText(consistency)}</Text>
-            <WeekBars weeks={consistency.weeks.map((w) => w.done)} planned={consistency.weeks[0]?.planned ?? null} />
+            <MiniBars
+              values={consistency.weeks.map((w) => w.done)}
+              reference={consistency.weeks[consistency.weeks.length - 1]?.planned ?? null}
+              emphasis={(i) => i === consistency.weeks.length - 1}
+              height={64}
+              label={`Sessions in each of the last ${consistency.weeks.length} weeks, oldest first: ${consistency.weeks.map((w) => w.done).join(', ')}.`}
+            />
             <Text variant="caption" color="ink2">
-              Sessions in each of the last {consistency.weeks.length} weeks, oldest on the left.
+              Sessions in each of the last {consistency.weeks.length} weeks, this week on the right.
             </Text>
           </View>
 
           <SectionLabel>Recent wins</SectionLabel>
-          {wins.length ? (
-            wins.slice(0, 12).map((w, i, arr) => <ListRow key={`${w.kind}-${w.exerciseId}-${w.date}`} title={w.text} subtitle={`${KIND_LABEL[w.kind]} · ${shortDate(w.date)}`} last={i === arr.length - 1} />)
+          {allWins.length ? (
+            allWins.slice(0, 12).map((w, i, arr) => (
+              <ListRow
+                key={w.id}
+                title={w.text}
+                subtitle={`${KIND_LABEL[w.kind as keyof typeof KIND_LABEL] ?? 'This week'} · ${shortDate(w.date)}`}
+                right={<IconButton icon="share" label={`Share: ${w.text}`} onPress={() => router.push({ pathname: '/share-win', params: { id: w.id } })} />}
+                last={i === arr.length - 1}
+              />
+            ))
           ) : (
             <View style={styles.body}>
               <Text variant="callout" color="ink2">
@@ -73,40 +103,18 @@ export default function Progress() {
 }
 
 function Trend({ t }: { t: E1rmTrend }) {
-  const { colors } = useTheme();
-  const max = Math.max(...t.points.map((p) => p.e1rm), 1);
-  const min = Math.min(...t.points.map((p) => p.e1rm), max);
-  const floor = Math.max(0, min - (max - min || max * 0.1));
+  const best = t.points.length ? Math.max(...t.points.map((p) => p.e1rm)) : null;
   return (
-    <View style={{ gap: space[2] }} accessible accessibilityLabel={trendText(t)}>
+    <View style={{ gap: space[2] }}>
       <Text variant="bodyStrong">{trendText(t)}</Text>
-      <View style={styles.bars}>
-        {t.points.map((p) => (
-          <View key={p.date} style={[styles.bar, { height: 8 + ((p.e1rm - floor) / (max - floor || 1)) * 40, backgroundColor: colors.brand }]} />
-        ))}
-      </View>
-      {t.points.length ? (
+      {t.points.length > 1 ? (
+        <MiniSpark values={t.points.map((p) => p.e1rm)} height={48} label={`${trendText(t)}. Estimated max per session, oldest first: ${t.points.map((p) => `${p.e1rm} kg`).join(', ')}.`} />
+      ) : null}
+      {best != null ? (
         <Text variant="caption" color="ink2" tabular>
-          {`${t.points[0]!.e1rm} kg → ${t.points[t.points.length - 1]!.e1rm} kg`}
+          {`One point per session, oldest on the left · best ${best} kg`}
         </Text>
       ) : null}
-    </View>
-  );
-}
-
-function WeekBars({ weeks, planned }: { weeks: number[]; planned: number | null }) {
-  const { colors } = useTheme();
-  const top = Math.max(planned ?? 0, ...weeks, 1);
-  return (
-    <View style={styles.bars}>
-      {weeks.map((n, i) => (
-        <View key={i} style={{ alignItems: 'center', gap: 2 }}>
-          <View style={[styles.bar, { height: 6 + (n / top) * 40, backgroundColor: n >= 2 ? colors.brand : colors.line }]} />
-          <Text variant="caption" color="ink2" tabular>
-            {String(n)}
-          </Text>
-        </View>
-      ))}
     </View>
   );
 }
@@ -115,6 +123,4 @@ const styles = StyleSheet.create({
   nav: { paddingHorizontal: space[2], paddingTop: space[2] },
   head: { paddingHorizontal: margin, gap: space[1], paddingBottom: space[2] },
   body: { paddingHorizontal: margin, paddingVertical: space[2], gap: space[2] },
-  bars: { flexDirection: 'row', alignItems: 'flex-end', gap: space[2], minHeight: 52 },
-  bar: { width: 14, borderRadius: radius.control },
 });

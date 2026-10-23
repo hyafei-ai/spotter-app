@@ -17,6 +17,9 @@ import {
 import { EmptyState, IconButton, Screen, SectionLabel, SegmentedControl, Skeleton, Tag, Text, TextField, useTheme, margin, space, touchMin } from '@spotter/ui';
 import { SyncBanner } from '../../src/SyncBanner';
 import { tenant } from '../../src/env';
+import { FUEL_PLAIN } from '../../src/fuel/plain';
+import { Explain } from '../../src/explain/Explain';
+import { WhoSeesLink } from '../../src/sharing/WhoSeesLink';
 import { isOn } from '../../src/modules';
 import { useNutritionSetup } from '../../src/nutrition/setup';
 import { dayLabel, kcal } from '../../src/nutrition/format';
@@ -85,6 +88,7 @@ export default function FuelCheckScreen() {
       <SectionLabel>Last two weeks</SectionLabel>
       <View style={[styles.body, { gap: space[2] }]} accessibilityLiveRegion="polite">
         <Text variant="figure">{FUEL_LEVEL_LABEL[check.level]}</Text>
+        <Text variant="bodyStrong">{FUEL_PLAIN[check.eaBand]}</Text>
         {check.eaAverage != null ? (
           <Text>
             Energy availability averaged {formatNumber(check.eaAverage)} kcal per kg fat-free mass: {EA_BAND_LABEL[check.eaBand].toLowerCase()}.
@@ -96,6 +100,7 @@ export default function FuelCheckScreen() {
           Screening bands, not a diagnosis: {EA_CUTOFFS.adequate}+ adequate, {EA_CUTOFFS.low} to {EA_CUTOFFS.adequate} reduced, under {EA_CUTOFFS.low} low.
           {ffm?.estimated ? ` ${ffm.note}.` : ''}
         </Text>
+        <Explain term="ea" />
       </View>
 
       {check.signs.length ? (
@@ -256,6 +261,7 @@ function Settings({ first, healthConnected }: { first: string; healthConnected: 
           Off by default. When it’s on, {first} sees the level (for example “Worth watching”) and the signs above in plain words. {first} never sees energy availability
           figures, body fat or bodyweight here. What {first} already sees from your food log stays the same.
         </Text>
+        <WhoSeesLink />
       </View>
     </>
   );

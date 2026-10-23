@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { uuidv7, type PainLog, type RegionLoad } from '@spotter/core';
-import { DEMO_CLIENT, EMPTY_SHARED_PAIN, coachClientIdFor, painKey, type SharedPainDoc } from '@spotter/core/demo';
+import { DEMO_CLIENT, EMPTY_SHARED_PAIN, coachClientIdFor, demoPainLogs, painKey, type SharedPainDoc } from '@spotter/core/demo';
 import { readShared, writeShared } from '@spotter/ui';
 import { kv } from '../storage';
 import { syncQueue } from '../sync';
@@ -23,6 +23,10 @@ export const NO_PAIN: PainEntry[] = [];
 interface InjuryState {
   hydrated: boolean;
   logs: PainEntry[];
+  /** Who sees what: whether new pain logs start shared with the coach (on by default). */
+  shareDefault: boolean;
+  /** Who sees what: sets the default and applies it to every existing log. */
+  setShareAll(on: boolean): Promise<void>;
   log(input: PainInput, date?: string): Promise<PainEntry>;
   update(id: string, patch: Partial<PainInput>): Promise<void>;
   remove(id: string): Promise<void>;
@@ -57,7 +61,19 @@ export const useInjury = create<InjuryState>()(
   persist(
     (set, get) => ({
       hydrated: false,
-      logs: NO_PAIN,
+      // MOCK: the demo starts with the same knee niggle the fuel check's sample data has, so every screen agrees.
+      logs: IS_DEMO ? demoPainLogs().map((l) => ({ ...l, shareWithCoach: true, loggedAt: `${l.date}T18:00:00.000Z` })) : NO_PAIN,
+      shareDefault: true,
+
+      async setShareAll(on) {
+        const stamp = new Date().toISOString();
+        const changed = get().logs.filter((l) => l.shareWithCoach !== on).map((l) => ({ ...l, shareWithCoach: on, loggedAt: stamp }));
+        const byId = new Map(changed.map((l) => [l.id, l]));
+        const logs = get().logs.map((l) => byId.get(l.id) ?? l);
+        set({ shareDefault: on, logs: logs.length ? logs : NO_PAIN });
+        for (const l of changed) await enqueue(l);
+        if (IS_DEMO) await publish(logs);
+      },
 
       async log(input, date = localDate()) {
         const entry: PainEntry = { ...input, id: uuidv7(), date, loggedAt: new Date().toISOString() };
@@ -95,7 +111,7 @@ export const useInjury = create<InjuryState>()(
     {
       name: `spotter.injury.${tenant.slug}`,
       storage: createJSONStorage(() => kv),
-      partialize: ({ logs }) => ({ logs }),
+      partialize: ({ logs, shareDefault }) => ({ logs, shareDefault }),
       onRehydrateStorage: () => () => useInjury.setState({ hydrated: true }),
     },
   ),

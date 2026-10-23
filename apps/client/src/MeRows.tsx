@@ -3,34 +3,23 @@ import { PlanRow, ReferralRow } from './billing/BillingRows';
 import { SharedTrainerRow } from './SharedTrainerRow';
 import { AccountRows } from './platform/AccountRows';
 import { DailyCheckRow } from './daily/DailyCheckRow';
-import { CycleRow } from './cycle/CycleRow';
-import { FuelMeRow } from './fuel/FuelRows';
-import { PainRow, ProgressRow } from './brief/BriefRows';
 
 /**
- * Extra rows on the client's Me tab (C-10): health app, billing, export, delete, etc.
- * Each feature adds its row component to ME_ROWS.
+ * Me is account only (docs/ux/client-experience.md). Body features (cycle, fuel, pain, recovery, mobility)
+ * live on the Body tab; Progress lives on Train. Each section lists its rows here.
  */
-const ME_ROWS: React.ComponentType[] = [
-  // feature rows
-  HealthRow,
-  PlanRow,
-  ReferralRow,
-  SharedTrainerRow,
-  DailyCheckRow,
-  CycleRow,
-  FuelMeRow,
-  ProgressRow,
-  PainRow,
-  AccountRows, // keep last: notifications, export, delete account, sign out
-];
+export const ME_PLAN_ROWS: React.ComponentType[] = [PlanRow, ReferralRow, SharedTrainerRow];
+export const ME_CONNECTION_ROWS: React.ComponentType[] = [HealthRow, DailyCheckRow];
 
-export function MeRows() {
+export function MeRows({ rows }: { rows: React.ComponentType[] }) {
   return (
     <>
-      {ME_ROWS.map((Row, i) => (
+      {rows.map((Row, i) => (
         <Row key={i} />
       ))}
     </>
   );
 }
+
+/** Notifications, export, delete account, sign out: always last. */
+export { AccountRows };

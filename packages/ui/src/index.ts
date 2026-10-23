@@ -19,3 +19,4 @@ export * from './components/VoiceOver';
 export * from './sampleClip';
 export * from './mediaStore';
 export * from './sharedDemo';
+export * from './components/MiniCharts';

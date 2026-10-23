@@ -28,10 +28,11 @@ const line = (minutes: number, kind: MobilityKind, title?: string) => `${minutes
  * "Did mobility?" on Today's rest-day and done views (docs/ux/mobility-capture.md): one tap logs the
  * suggestion; "Something else" opens minutes and type. Logged today shows with an undo.
  */
-export function MobilityLog({ suggestion }: { suggestion?: MobilitySuggestion }) {
+export function MobilityLog({ suggestion, heading = 'Mobility' }: { suggestion?: MobilitySuggestion; heading?: string }) {
   const logs = useMobility((s) => s.logs);
   const log = useMobility((s) => s.log);
   const remove = useMobility((s) => s.remove);
+  const shared = useMobility((s) => s.shareWithCoach);
   const first = tenant.coach.name.split(' ')[0] ?? '';
   const today = localDate();
   const todays = logs.filter((l) => l.date === today);
@@ -54,7 +55,7 @@ export function MobilityLog({ suggestion }: { suggestion?: MobilitySuggestion })
 
   return (
     <View>
-      <SectionLabel>Mobility</SectionLabel>
+      <SectionLabel>{heading}</SectionLabel>
       <View style={styles.body}>
         {todays.map((l) => (
           <View key={l.id} style={styles.logged}>
@@ -63,7 +64,7 @@ export function MobilityLog({ suggestion }: { suggestion?: MobilitySuggestion })
           </View>
         ))}
         {todays.length === 0 ? (
-          <Text color="ink2">{`Did mobility today? ${first} sees it with your sessions.`}</Text>
+          <Text color="ink2">{`Did mobility today? ${shared ? `${first} sees it with your sessions.` : 'Only you see it.'}`}</Text>
         ) : null}
         {!open && todays.length === 0 ? (
           <View style={styles.actions}>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -13,6 +13,8 @@ import { TONE_LABEL, TONE_TAG } from '../src/daily/TodayRead';
 import { useHealthStatus } from '../src/health/HealthRow';
 import { health } from '../src/health/source';
 import { useCycleToday } from '../src/cycle/hooks';
+import { useHealthImports } from '../src/health/store';
+import { WhoSeesLink } from '../src/sharing/WhoSeesLink';
 import { useSharedBriefFor, useTodayBriefContext } from '../src/brief/useBrief';
 import { BriefBody } from '../src/brief/BriefBody';
 import { PainCheck } from '../src/injury/PainCheck';
@@ -57,9 +59,22 @@ export default function CheckToday() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
 
-  // Prefill sleep from the connected health app; typing over it makes it a manual entry.
+  // Prefill sleep from the wearable (what the brief already used), with its source; typing over it makes it
+  // a manual entry. Falls back to reading the health app directly when connected.
+  const wearableDays = useHealthImports((s) => s.wearableDays);
+  const wearableOrigin = useHealthImports((s) => s.origin);
+  const wearableSleep = wearableDays.find((d) => d.date === today && d.source !== 'manual' && d.sleepHours != null) ?? null;
+  const [sleepFrom, setSleepFrom] = useState<string | null>(null);
+  const prefilled = useRef(false);
   useEffect(() => {
-    if (existing || healthStatus !== 'connected') return;
+    if (existing || !wearableSleep || prefilled.current) return;
+    prefilled.current = true;
+    setSleep(Math.round(wearableSleep.sleepHours! * 2) / 2);
+    setSleepSource('health');
+    setSleepFrom(`${wearableSleep.source === 'apple_health' ? 'Apple Watch via Apple Health' : 'Health Connect'}${wearableOrigin === 'mock' ? ' (sample data)' : ''}`);
+  }, [existing, wearableSleep, wearableOrigin]);
+  useEffect(() => {
+    if (existing || healthStatus !== 'connected' || wearableSleep) return;
     let live = true;
     void health
       .readToday()
@@ -67,13 +82,14 @@ export default function CheckToday() {
         if (live && t.sleepHours != null) {
           setSleep(Math.round(t.sleepHours * 2) / 2);
           setSleepSource('health');
+          setSleepFrom(health.provider ?? 'your health app');
         }
       })
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [existing, healthStatus]);
+  }, [existing, healthStatus, wearableSleep]);
 
   const input: CheckInput = {
     sleepHours: sleep,
@@ -177,7 +193,7 @@ export default function CheckToday() {
               }}
             />
             <Text variant="caption" color="ink2">
-              {sleepSource === 'health' ? 'From your health app. Change it if it looks off.' : 'Your best guess is fine.'}
+              {sleepSource === 'health' ? `From ${sleepFrom ?? 'your health app'}. Change it if it looks off.` : 'Your best guess is fine.'}
             </Text>
           </View>
         )}
@@ -246,6 +262,7 @@ export default function CheckToday() {
               ? `${first} sees the read below${note.trim() ? ', including your note' : ''}${input.cyclePhase && !shareCycle ? ', but not your cycle phase' : ''}.`
               : `${first} sees that you checked in, and nothing else.`}
           </Text>
+          <WhoSeesLink />
         </View>
       </View>
 

@@ -19,6 +19,9 @@ export const NO_MOBILITY: MobilityEntry[] = [];
 interface MobilityState {
   hydrated: boolean;
   logs: MobilityEntry[];
+  /** Who sees what: the coach sees mobility logs (on by default, like sessions). */
+  shareWithCoach: boolean;
+  setShare(on: boolean): Promise<void>;
   log(input: { minutes: number; kind: MobilityKind; routineId?: string | null }, date?: string): Promise<MobilityEntry>;
   remove(id: string): Promise<void>;
 }
@@ -28,6 +31,13 @@ export const useMobility = create<MobilityState>()(
     (set, get) => ({
       hydrated: false,
       logs: NO_MOBILITY,
+      shareWithCoach: true,
+
+      async setShare(on) {
+        set({ shareWithCoach: on });
+        await syncQueue.enqueue('mobility.share.set', { shareWithCoach: on, updatedAt: new Date().toISOString() });
+        void syncQueue.flush();
+      },
 
       async log(input, date = localDate()) {
         const entry: MobilityEntry = {
@@ -47,6 +57,7 @@ export const useMobility = create<MobilityState>()(
           kind: entry.kind,
           routineId: entry.routineId,
           loggedAt: entry.loggedAt,
+          shareWithCoach: get().shareWithCoach,
         });
         void syncQueue.flush();
         return entry;
@@ -62,7 +73,7 @@ export const useMobility = create<MobilityState>()(
     {
       name: `spotter.mobility.${tenant.slug}`,
       storage: createJSONStorage(() => kv),
-      partialize: ({ logs }) => ({ logs }),
+      partialize: ({ logs, shareWithCoach }) => ({ logs, shareWithCoach }),
       onRehydrateStorage: () => () => useMobility.setState({ hydrated: true }),
     },
   ),
