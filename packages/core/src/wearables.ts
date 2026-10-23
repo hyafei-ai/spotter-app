@@ -16,7 +16,7 @@ const DAY = 86_400_000;
 const dayNum = (iso: string) => Math.floor(Date.parse(`${iso}T00:00:00Z`) / DAY);
 const isoOf = (n: number) => new Date(n * DAY).toISOString().slice(0, 10);
 
-export const BASELINE_DAYS = 28;
+export const WEARABLE_BASELINE_DAYS = 28;
 export const BASELINE_MIN_READINGS = 7;
 export const RESTING_HR_HIGH_BPM = 5;
 
@@ -55,7 +55,7 @@ function statusFor(days: WearableDay[], today: string, pick: (d: WearableDay) =>
     .filter((d) => d.source === todays.source && pick(d) != null)
     .filter((d) => {
       const ago = t - dayNum(d.date);
-      return ago >= 1 && ago <= BASELINE_DAYS;
+      return ago >= 1 && ago <= WEARABLE_BASELINE_DAYS;
     })
     .map(pick) as number[];
   if (prior.length < BASELINE_MIN_READINGS) {

@@ -16,7 +16,7 @@ const DAY = 86_400_000;
 const dayNum = (iso: string) => Math.floor(Date.parse(`${iso}T00:00:00Z`) / DAY);
 
 /** Rolling baseline window for each lift, in days before the session. */
-export const BASELINE_DAYS = 56;
+export const CALIBRATION_BASELINE_DAYS = 56;
 /** A lift needs at least this many earlier sessions in the window before it is compared. */
 export const BASELINE_MIN = 3;
 /** Shrinkage: deltaPct × n / (n + k). With k = 6, six sessions halve a phase's raw average. */
@@ -66,7 +66,7 @@ export function sessionDeltas(sessions: CalibrationSession[]): { date: string; d
     const t = dayNum(s.date);
     const prior = sorted
       .map((p, j) => ({ p, j }))
-      .filter(({ p, j }) => j !== i && dayNum(p.date) < t && t - dayNum(p.date) <= BASELINE_DAYS);
+      .filter(({ p, j }) => j !== i && dayNum(p.date) < t && t - dayNum(p.date) <= CALIBRATION_BASELINE_DAYS);
     const deltas: number[] = [];
     for (const [exerciseId, e1rm] of bests[i]!) {
       const history = prior.map(({ j }) => bests[j]!.get(exerciseId)).filter((x): x is number => x != null);
