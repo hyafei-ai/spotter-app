@@ -45,6 +45,7 @@ import { tenant } from '../../../src/env';
 import { isOn } from '../../../src/modules';
 import { prescribed, resultText, targetText, w } from '../../../src/format';
 import { previousSet, suggestionFor, useApp } from '../../../src/store';
+import { useSessionCalibration } from '../../../src/cycle/hooks';
 
 interface Entry {
   weightKg: number | null;
@@ -81,6 +82,11 @@ export default function Logger() {
     return exercise ? { exercise, setIndex: Number(idx), key: currentKey } : null;
   }, [session, currentKey]);
 
+  // Cycle-phase calibration of suggested loads (docs/features/cycle.md). Off on the coach's lighter or
+  // recovery version: that version is already lighter, and the two are never stacked.
+  const cal = useSessionCalibration(session?.sessionId ?? null, session?.variant);
+  const calibrate = cal.adjust;
+
   const suggestion = (e: ProgramExercise) =>
     session?.keptLoad[e.id] || session?.variant ? null : suggestionFor(e, completed);
 
@@ -108,8 +114,9 @@ export default function Logger() {
     const suggested = session?.keptLoad[e.id] || session?.variant
       ? null
       : (suggestionFor(e, completed)?.suggestedLoadKg ?? null);
-    const base = defaultEntry(e, current.setIndex, prev, suggested);
     const p = e.sets.find((s) => s.index === current.setIndex);
+    // Calibration adjusts only the suggestion (planned or progression load), never anything logged.
+    const base = defaultEntry(e, current.setIndex, prev, calibrate(suggested ?? p?.loadKg ?? null));
     return {
       weightKg: earlier?.weightKg ?? base.weightKg,
       reps: base.reps,
@@ -117,7 +124,7 @@ export default function Logger() {
       durationS: e.metric === 'time' ? (p?.durationS ?? 30) : null,
       distanceM: e.metric === 'distance' ? (p?.distanceM ?? 20) : null,
     };
-  }, [current, logged, completed, session?.keptLoad, session?.variant]);
+  }, [current, logged, completed, session?.keptLoad, session?.variant, calibrate]);
   const [edited, setEdited] = useState<{ key: SetKey; entry: Entry } | null>(null);
   const entry = current && edited?.key === current.key ? edited.entry : defaults;
   const setEntry = (e: Entry) => current && setEdited({ key: current.key, entry: e });
@@ -248,6 +255,16 @@ export default function Logger() {
       <SyncBanner />
 
       <ScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: space[12] }}>
+        {cal.line ? (
+          <View style={[styles.suggest, { borderLeftColor: colors.brand, backgroundColor: colors.surface }]} accessibilityLiveRegion="polite">
+            <Text variant="callout">{cal.active ? cal.line : 'Using planned loads today.'}</Text>
+            <Pressable onPress={() => cal.setOff(cal.active)} accessibilityRole="button" hitSlop={8} style={{ alignSelf: 'flex-start', paddingVertical: space[1] }}>
+              <Text variant="bodyStrong" style={{ color: colors.brand }}>
+                {cal.active ? 'Use planned loads instead' : 'Use your cycle-adjusted loads'}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
         {session.plan.exercises.map((e) => {
           const s = suggestion(e);
           const swap = session.swaps[e.id];
@@ -359,7 +376,7 @@ export default function Logger() {
                   <SetRow
                     key={key}
                     setNumber={p.index + 1}
-                    target={targetText(e, p.index, s?.suggestedLoadKg ?? p.loadKg)}
+                    target={targetText(e, p.index, cal.adjust(s?.suggestedLoadKg ?? p.loadKg))}
                     previous={resultText(e, prev)}
                     state={isCurrent ? 'active' : done ? 'logged' : 'upcoming'}
                     result={done ? resultText(e, done) : undefined}

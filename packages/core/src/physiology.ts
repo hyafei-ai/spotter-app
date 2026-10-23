@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { isoDate } from './schemas';
-import { CYCLE_PHASES, type CyclePhase, type ReadTone } from './signals';
+import type { CyclePhase, ReadTone } from './signals';
 
 /**
  * Shared contracts for the physiology layer (docs/physiology.md): cycle-phase calibration, fuelling
@@ -22,7 +22,7 @@ import { CYCLE_PHASES, type CyclePhase, type ReadTone } from './signals';
  * How the athlete's cycle works right now. Women 35+ are often on hormonal contraception, in
  * perimenopause, or past menopause, so "28-day natural cycle" is one mode of six, not the default.
  */
-export const CYCLE_MODES = ['natural', 'hormonal', 'irregular', 'perimenopause', 'postmenopause', 'not_tracking'] as const;
+export const CYCLE_MODES = ['natural', 'hormonal', 'irregular', 'perimenopause', 'postmenopause', 'not_tracking', 'pregnant_postpartum'] as const;
 export const CycleMode = z.enum(CYCLE_MODES);
 export type CycleMode = z.infer<typeof CycleMode>;
 export const CYCLE_MODE_LABEL: Record<CycleMode, string> = {
@@ -32,6 +32,7 @@ export const CYCLE_MODE_LABEL: Record<CycleMode, string> = {
   perimenopause: 'Perimenopause',
   postmenopause: 'Post-menopause',
   not_tracking: 'Not tracking',
+  pregnant_postpartum: 'Pregnant or postpartum',
 };
 
 export const PeriodLog = z.object({
@@ -39,6 +40,8 @@ export const PeriodLog = z.object({
   start: isoDate,
   /** Last day of bleeding, when known. */
   end: isoDate.nullable(),
+  /** Where it came from: typed in, or read from Apple Health / Health Connect. Absent means typed in. */
+  source: z.enum(['manual', 'health']).optional(),
 });
 export type PeriodLog = z.infer<typeof PeriodLog>;
 

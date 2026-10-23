@@ -5,6 +5,7 @@ import { NutritionSection } from './nutrition/NutritionSection';
 import { CoachSection } from './platform/CoachSection';
 import { ReadSection } from './ReadSection';
 import { RememberSection } from './memory/RememberSection';
+import { CycleSection } from './CycleSection';
 
 /**
  * Feature sections on the coach's client detail (K-3): program, check-ins, form checks, nutrition,
@@ -20,6 +21,7 @@ const SECTIONS: React.ComponentType<{ clientId: string }>[] = [
   CoachSection,
   ReadSection,
   RememberSection,
+  CycleSection,
 ];
 
 export function ClientSections({ clientId }: { clientId: string }) {

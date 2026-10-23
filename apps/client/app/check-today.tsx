@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { CYCLE_PHASES, CYCLE_PHASE_LABEL, type CyclePhase, type DailyCheck } from '@spotter/core';
+import { CYCLE_PHASES, CYCLE_PHASE_LABEL, phaseLine, type CycleMode, type CyclePhase, type DailyCheck } from '@spotter/core';
 import { Banner, Button, IconButton, Screen, SectionLabel, SegmentedControl, Skeleton, Stepper, Tag, Text, TextField, useTheme, margin, space, touchMin } from '@spotter/ui';
 import { SyncBanner } from '../src/SyncBanner';
 import { tenant } from '../src/env';
@@ -12,6 +12,10 @@ import { readFor, useReadInputs } from '../src/daily/read';
 import { TONE_LABEL, TONE_TAG } from '../src/daily/TodayRead';
 import { useHealthStatus } from '../src/health/HealthRow';
 import { health } from '../src/health/source';
+import { useCycleToday } from '../src/cycle/hooks';
+
+/** Modes where a manual phase is the fallback until periods are logged (Your cycle). */
+const MANUAL_FALLBACK: CycleMode[] = ['natural', 'irregular', 'perimenopause'];
 
 const SCALE = ['1', '2', '3', '4', '5'].map((v) => ({ value: v, label: v }));
 
@@ -28,6 +32,11 @@ export default function CheckToday() {
   const today = localDate();
   const existing = checks.find((c) => c.date === today);
   const first = tenant.coach.name.split(' ')[0] ?? '';
+  // Cycle: the estimate from Your cycle when it's set up; the manual phase only as a fallback.
+  const { profile: cycle, estimate } = useCycleToday();
+  const cycleOn = settings.cycleTracking || cycle.mode !== 'not_tracking';
+  const estimated = cycleOn ? estimate.phase : null;
+  const manualFallback = !estimated && (cycle.mode === 'not_tracking' || (MANUAL_FALLBACK.includes(cycle.mode) && cycle.periods.length === 0));
 
   const [sleep, setSleep] = useState<number | null>(existing ? existing.sleepHours : null);
   const lastSleep = [...checks].reverse().find((c) => c.sleepHours != null)?.sleepHours ?? 7.5;
@@ -67,15 +76,16 @@ export default function CheckToday() {
     energy,
     soreness,
     stress,
-    cyclePhase: settings.cycleTracking ? cyclePhase : null,
-    shareCycle: settings.cycleTracking && cyclePhase ? shareCycle : false,
+    // Keeps DailyCheck.cyclePhase filled from the estimate, so the read and the coach's view work as before.
+    cyclePhase: estimated ?? (cycleOn && manualFallback ? cyclePhase : null),
+    shareCycle: (estimated ?? (cycleOn && manualFallback ? cyclePhase : null)) ? shareCycle : false,
     note: note.trim() ? note.trim().slice(0, 300) : null,
     shareWithCoach: share,
   };
   const preview = useMemo(
     () => readFor(today, { ...input, id: 'preview', date: today, submittedAt: new Date().toISOString() } as DailyCheck, inputs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [today, inputs, sleep, energy, soreness, stress, cyclePhase, note],
+    [today, inputs, sleep, energy, soreness, stress, cyclePhase, estimated, note],
   );
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/today'));
@@ -170,7 +180,29 @@ export default function CheckToday() {
         <Scale label="Stress" low="Calm" high="Very stressed" value={stress} onChange={setStress} />
         <TextField label="Anything else? (optional)" value={note} onChangeText={setNote} maxLength={300} placeholder="Knee feels tight, long shift yesterday…" multiline />
 
-        {settings.cycleTracking ? (
+        {cycleOn && estimated ? (
+          <View style={{ gap: space[2] }}>
+            <Text variant="label" color="ink2">
+              Cycle
+            </Text>
+            <Text>{phaseLine(estimate)}</Text>
+            <Pressable onPress={() => router.push('/cycle')} accessibilityRole="link" hitSlop={8} style={{ alignSelf: 'flex-start', paddingVertical: space[1] }}>
+              <Text variant="bodyStrong" style={{ color: colors.brand }}>
+                Not right? Log your period
+              </Text>
+            </Pressable>
+            <Toggle label={`Share cycle phase with ${first}`} value={shareCycle} onChange={setShareCycle} />
+          </View>
+        ) : cycleOn && !manualFallback ? (
+          <View style={{ gap: space[1] }}>
+            <Text variant="label" color="ink2">
+              Cycle
+            </Text>
+            <Text variant="callout" color="ink2">
+              {estimate.note}
+            </Text>
+          </View>
+        ) : cycleOn ? (
           <View style={{ gap: space[3] }}>
             <Pressable
               onPress={() => setCycleOpen((o) => !o)}
