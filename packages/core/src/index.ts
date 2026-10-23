@@ -22,3 +22,4 @@ export * from './pull';
 export * from './signals';
 export * from './memory';
 export * from './retention';
+export * from './physiology';
