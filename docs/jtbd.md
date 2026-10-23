@@ -54,7 +54,7 @@ is shown only on the business view and, subtly, as a plan value on the coach's o
 | Per-client **memory** timeline (sleep streaks, load spikes, what they last said, PRs, notes) | Coach: coaching | Remembers what they'd forget |
 | **30-second prep** card on client detail; **follow-ups** that resurface in Clients | Coach: coaching | Preps a conversation in under 30 s |
 | Body-variance triage reasons ("Short sleep 3 nights") in coach language | Coach: coaching | Remembers; never says "churn" |
-| Clients → **Needs attention**: the one "who to check in with" list, with plain reasons (and the plan value, for the coach who owns the business) | Coach: business | (1) spots a specific client who might leave, with the reason and money |
+| Clients → **Check in**: the one "who to check in with" list, with plain reasons (and the plan value, for the coach who owns the business) | Coach: business | (1) spots a specific client who might leave, with the reason and money |
 | Client detail → **Check in** card: reasons, what to ask, **I checked in** (message, call, session, other) | Coach: business | (1) acts on it in under 30 s |
 | **Kept after a check-in**: still active 60 days later, with the dollar value, on Me → Your business → Keeping clients | Coach: business | (2) shows a client stayed, with a dollar amount |
 | Teams only: **Ask {assistant} to check in** for a client an assistant coaches; it shows up in that coach's Clients list | Coach: business | (1) acts through the client's own coach |
@@ -69,7 +69,7 @@ Same jobs, same tests ([`docs/physiology.md`](physiology.md), [`docs/features/at
 
 | Feature | Job | Test it passes |
 |---|---|---|
-| **Needs attention** reasons from what each client shared ("Running tired 5 of the last 7 days", "Fuel check flagged") | Coach: coaching | Remembers what they'd otherwise miss; the list says "Needs a check-in soon" / "Worth watching", never "churn" or "at risk" |
+| **Check in** reasons from what each client shared ("Running tired 5 of the last 7 days", "Fuel check flagged") | Coach: coaching | Remembers what they'd otherwise miss; the list says "Needs a check-in soon" / "Worth watching", never "churn" or "at risk" |
 | Client detail → **Between sessions**: shared reads, fuel check, pain, progress, cycle, plus what to ask (becomes the Check in card when the client is on the list) | Coach: coaching | Preps a conversation in under 30 s |
 | **Keeping clients**: live MRR at risk per currency, 12-week trend, MRR kept after a check-in | Coach: business | Spots clients who might leave with money at stake; shows clients kept, with a dollar amount |
 

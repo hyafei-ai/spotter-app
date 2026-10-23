@@ -7,7 +7,7 @@ Spotter has two roles: the client and the coach, and the coach owns their coachi
 role). This doc covers logging a check-in and seeing who stayed. Who to check in with, and the money at risk, is in
 [`at-risk.md`](at-risk.md). The two make one story:
 
-1. **Clients → Needs attention** lists who could use a check-in, with reasons.
+1. **Clients → Check in** lists who could use a check-in, with reasons.
 2. Open a client → the **Check in** card shows the reasons and what to ask → **I checked in** (message, call,
    session, other).
 3. **Me → Your business → Keeping clients** shows who stayed 60 days later, with the money.
@@ -25,7 +25,7 @@ doesn't repeat them. (Type and SQL names keep "member": they mirror `memberships
 ## What changed (Oct 2026)
 
 The first build assumed a separate gym owner and had three overlapping lists (Members to talk to, Retention's
-list, Needs attention) plus an owner-versus-coach privacy wall. There are no gym owners, so:
+list, Check in) plus an owner-versus-coach privacy wall. There are no gym owners, so:
 
 - **Members to talk to is retired.** `apps/coach/app/members.tsx` redirects to `/clients?filter=attention`, and its
   Me row is gone. On the web, `/dashboard/members` redirects to `/dashboard/retention`.
@@ -37,7 +37,7 @@ list, Needs attention) plus an owner-versus-coach privacy wall. There are no gym
 ## What's built
 
 ### I checked in (client detail)
-- **Where:** client detail, the **Check in** card, shown when the client is on Needs attention. It holds the level
+- **Where:** client detail, the **Check in** card, shown when the client is on Check in. It holds the level
   ("Needs a check-in soon" / "Worth watching"), the engagement reasons, the shared signals (bold when worth raising),
   up to three **What to ask** lines (`src/atrisk/summary.ts`: `whatToAsk`, `whatToAskAboutTraining`), and
   **I checked in**.

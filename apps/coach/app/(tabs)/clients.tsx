@@ -40,7 +40,7 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'all', label: 'All' },
   // The one "who to check in with" list: reasons from sessions, app use and what each client shared
   // (src/atrisk). Me → Your business → "See who needs a check-in" opens it with ?filter=attention.
-  { value: 'attention', label: 'Needs attention' },
+  { value: 'attention', label: 'Check in' },
   { value: 'new', label: 'New' },
   { value: 'paused', label: 'Paused' },
   { value: 'payment', label: 'Payment issue' },

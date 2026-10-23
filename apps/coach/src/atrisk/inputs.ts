@@ -18,7 +18,7 @@ import { getSharedReads, useReadsDoc } from '../reads';
 import { useTeam } from '../platform/team';
 
 /*
- * What each athlete shared between sessions, gathered for the coach's "Needs attention" list and the
+ * What each athlete shared between sessions, gathered for the coach's "Check in" list and the
  * "Between sessions" section (docs/features/at-risk.md). Coach side only: the owner never reads this.
  *
  * MOCK transport in the demo: the client app writes what the athlete shared to readShared keys.

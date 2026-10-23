@@ -24,7 +24,7 @@ const shortDate = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00Z`).toL
 /**
  * Me → Your business → Keeping clients. The coach's business job (docs/jtbd.md): income at risk this
  * month, the last 12 weeks, and who stayed after a check-in. Owner role only, so assistant coaches in
- * a team never see money. Who to check in with is one list, Clients → Needs attention.
+ * a team never see money. Who to check in with is one list, Clients → Check in.
  */
 export default function Retention() {
   const { isOwner } = useRole();
@@ -147,7 +147,7 @@ function KeptList({ kept }: { kept: ReturnType<typeof useRetentionViews>['kept']
   if (!rows.length) {
     return (
       <Text color="ink2" style={styles.foot}>
-        When you check in with someone on Needs attention, you’ll see here whether they stayed.
+        When you check in with someone on Check in, you’ll see here whether they stayed.
       </Text>
     );
   }

@@ -176,7 +176,7 @@ export default function RetentionPage() {
               </div>
             )}
             <p className="muted" style={{ margin: 0, fontSize: 13, maxWidth: 620 }}>
-              Log a check-in from the client’s page in the coach app (Clients → Needs attention). Plan values are monthly.
+              Log a check-in from the client’s page in the coach app (Clients → Check in). Plan values are monthly.
             </p>
           </section>
 

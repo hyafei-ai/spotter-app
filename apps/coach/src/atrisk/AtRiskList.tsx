@@ -9,7 +9,7 @@ import { useRetention } from '../retention/store';
 import { localToday, useEngagement, usePhysiologyMap } from './inputs';
 
 /**
- * Clients → "Needs attention": the one "who to check in with" list. Most first, with the top two
+ * Clients → "Check in": the one "who to check in with" list. Most first, with the top two
  * reasons from sessions, app use and what each client shared with their coach. Coach language only
  * (docs/jtbd.md): no churn, no risk, no scores. Logging the check-in happens on client detail.
  */

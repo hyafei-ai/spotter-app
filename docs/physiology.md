@@ -20,7 +20,7 @@ Tracking apps each see one slice (recovery, workouts, macros) and none connect t
 | Athlete | **Cycle-phase calibration**: suggested loads adjust to how *their own* lifts run in each phase, once there's enough of their own data to say so. Works across natural cycles, hormonal contraception, irregular cycles, perimenopause and post-menopause. |
 | Athlete | **Fuel check**: energy availability from food logs and training, and a screen for the low-energy pattern (with cycle changes, repeat injuries, falling performance). Points to a doctor or sports dietitian, never diagnoses. |
 | Athlete | **Progress beyond raw PRs**: calibrated bests ("strongest late-luteal squat yet"), rep bests, estimated-max trend, consistency. |
-| Coach | The same read between sessions, for what the athlete chose to share, and one **Needs attention** list with physiology reasons (running tired, under-fuelled, ongoing pain, stalled). A check-in card on client detail to log "I checked in". |
+| Coach | The same read between sessions, for what the athlete chose to share, and one **Check in** list with physiology reasons (running tired, under-fuelled, ongoing pain, stalled). A check-in card on client detail to log "I checked in". |
 | Coach (their business) | The coach owns their coaching business, so they also get the business view, **Keeping clients**: live MRR at risk, the 12-week trend, and MRR kept after check-ins. Assistant coaches in a team don't see money. |
 
 ## Ground rules
@@ -50,4 +50,4 @@ in preparation) can replace it by implementing the same interface, with no UI ch
 | Cycle + calibration | `cycle.ts`, `calibration.ts` | `docs/features/cycle.md` |
 | Fuelling + energy availability | `fuel.ts` | `docs/features/fuel.md` |
 | Daily brief, wearables, injury, progress | `brief.ts`, `injury.ts`, `progress.ts` | `docs/features/brief.md` |
-| Needs attention + the coach's business view (MRR at risk, kept) | `atrisk.ts` (on `retention.ts`, `signals.ts`) | `docs/features/at-risk.md`, `docs/features/retention.md` |
+| Check in + the coach's business view (MRR at risk, kept) | `atrisk.ts` (on `retention.ts`, `signals.ts`) | `docs/features/at-risk.md`, `docs/features/retention.md` |

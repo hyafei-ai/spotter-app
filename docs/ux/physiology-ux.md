@@ -106,11 +106,11 @@ import with dedupe (R5, R6); a watch app focused on the session and the morning 
    iOS never reports read-denial, so show "No data yet", never "denied".
 
 **Coach, a Tuesday (T5)**
-Clients → "Needs attention" (3) → client → "Between sessions" (running tired 4 of 7 days; fuel check: worth a look;
+Clients → "Check in" (3) → client → "Between sessions" (running tired 4 of 7 days; fuel check: worth a look;
 shared) → "What to ask" → message, or adjust the lighter rule → mark handled. Target: under 30 seconds to a decision.
 
 **Coach, Monday, the business look (T7)**
-Me → Your business → Keeping clients → "≈ $632 a month at risk" → See who needs a check-in → Clients, Needs attention
+Me → Your business → Keeping clients → "≈ $632 a month at risk" → See who needs a check-in → Clients, Check in
 (Chris, "Needs a check-in soon", "$160/mo") → Chris → Check in card → message or call → I checked in (call) → 60 days
 later "Kept: $160 a month". Teams only: for a client an assistant coaches, "Ask Leo to check in" on the same card.
 
@@ -145,7 +145,7 @@ later "Kept: $160 a month". Teams only: for a client an assistant coaches, "Ask 
 | F6 | Calibration | Nothing tells the athlete it's still learning | Medium | R4: "Learning your cycle: 1 of 2 cycles" and what it'll do when ready | Building (cycle build) |
 | F7 | Fuel screen | A missed period during pregnancy or on some contraception would false-flag | High | Mode-aware screen; pregnant/postpartum mode pauses it | Building |
 | F8 | Teams | Risk reasons could leak health information to a coach who isn't the client's | Critical | `reasonsFor`: the client's own coach sees reasons; the head coach sees "their coach flagged something" for an assistant's client only | Done (Oct 24) |
-| F11 | Coach | Three overlapping "who to talk to" lists (Members to talk to, Retention, Needs attention) and an owner wall that assumed a gym owner | High | One list (Needs attention), check-in on client detail, business view on Me | Done (Oct 24) |
+| F11 | Coach | Three overlapping "who to talk to" lists (Members to talk to, Retention, Check in) and an owner wall that assumed a gym owner | High | One list (Check in), check-in on client detail, business view on Me | Done (Oct 24) |
 | F9 | Web dashboard | Sidebar cramped at phone width | Medium | Collapse to a top bar ≤640px | Building (at-risk build) |
 | F10 | Coach | Briefs say what's wrong but not what the session is *for* | Medium | R7: Stimulus line per session | Proposed |
 
@@ -155,7 +155,7 @@ Athlete tabs: **Today** (brief → session → due items) · **Train** (program,
 **Fuel** (day totals from Health or Spotter, fuel check; hidden when the module is off) · **Coach** (thread) · **Me**
 (Health connections, Your cycle, Pain, **Who sees what**, settings).
 
-Coach: Clients ("Needs you / All / Needs attention") → client (Before you talk, Needs you, **Check in** or Between
+Coach: Clients ("Needs you / All / Check in") → client (Before you talk, Needs you, **Check in** or Between
 sessions, This week, Today's brief, Cycle and Fuel if shared, Pain, Remember) · Programs · Grow · Me (**Your
 business**: Keeping clients, Team, Import and export; owner role only).
 
@@ -194,7 +194,7 @@ block or week ("build squat volume; deload week 4"), drafted by AI from the prog
 what it's for ("heavy strength: top sets at RPE 8") so the brief can modify it sensibly ("today keep the top set,
 drop the back-off sets"). The athlete sees only coach-approved text.
 
-**Retention-intelligence engine.** One engine, one list: Needs attention, with the physiology reasons the athlete
+**Retention-intelligence engine.** One engine, one list: Check in, with the physiology reasons the athlete
 shared, and a check-in logged on client detail. The coach's business view adds MRR at risk per currency, the trend and
 kept value. Teams only: a neutral line and "Ask {assistant}" for a client an assistant coaches.
 

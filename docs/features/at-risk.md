@@ -1,11 +1,11 @@
-# Needs attention and Keeping clients
+# Check in and Keeping clients
 
 Part of the physiology layer ([`docs/physiology.md`](../physiology.md)). Spotter has two roles, the client and the
 coach, and the coach owns their coaching business. Jobs from [`docs/jtbd.md`](../jtbd.md):
 
 | Piece | Who | Job | Test it passes |
 |---|---|---|---|
-| **Needs attention** in Clients: the one "who to check in with" list, with reasons from engagement and what each client shared | Coach | Coaching: remember; business: keep clients | remembers what they'd otherwise miss; spots a specific client who might leave |
+| **Check in** in Clients: the one "who to check in with" list, with reasons from engagement and what each client shared | Coach | Coaching: remember; business: keep clients | remembers what they'd otherwise miss; spots a specific client who might leave |
 | **Check in** card on client detail (Between sessions), with what to ask and **I checked in** | Coach | Same | preps a real conversation in under 30 seconds and records it |
 | **Keeping clients** (Me → Your business): live MRR at risk, 12-week trend, MRR kept after a check-in | The coach who owns the business (owner role) | Business: keep clients and income | money at stake; clients kept, with a dollar amount |
 
@@ -46,9 +46,9 @@ A solo coach is the client's own coach for every client: they always read the mi
   engagement reasons and collapses every physiology reason into one line, `OWNER_NEUTRAL_REASON`: "Their coach has
   flagged something worth a check-in". `checkInCoach(viewerId, client, coaches)` names the other active coach to
   ask, or null, so a solo coach never sees hand-off UI.
-- **Rosters:** `atRiskRoster` (Needs attention; `AtRiskList` applies `reasonsFor`) and
+- **Rosters:** `atRiskRoster` (Check in; `AtRiskList` applies `reasonsFor`) and
   `ownerRoster(…, { viewerId, solo })` (the web business view: full reasons for the coach's own clients). Both leave
-  out paused and cancelled clients and anyone under two weeks in. Needs attention sorts by level, then points, then
+  out paused and cancelled clients and anyone under two weeks in. Check in sorts by level, then points, then
   name; the business view by level, then monthly value. Without `viewerId`, `ownerRoster` returns the neutral copy
   for everyone.
 - **Coach copy for levels** (`COACH_LEVEL_TEXT`): high "Needs a check-in soon", medium "Worth watching".
@@ -85,7 +85,7 @@ currencies, trend gaps and kept.
 ## What's built
 
 ### Coach app
-- **Clients → "Needs attention"** chip (`src/atrisk/AtRiskList.tsx`). `/clients?filter=attention` opens it
+- **Clients → "Check in"** chip (`src/atrisk/AtRiskList.tsx`). `/clients?filter=attention` opens it
   directly (Keeping clients and the old `/members` link use this).
   - Ordered by level, then points. Reasons through `reasonsFor` for the viewer.
   - Each row: name, the level in words, the top two reasons, and (owner role only) the plan value, "$160/mo",
@@ -100,7 +100,7 @@ currencies, trend gaps and kept.
 - **Me → Your business → Keeping clients** (owner role only, first row of the business section in
   `PlatformRows`). The row's subtitle is MRR at risk and the client count. `app/retention.tsx`: the per-currency
   headline with the "needs a check-in soon" / "worth watching" split, **See who needs a check-in (n)** (the one
-  primary action; opens Needs attention), 12 weekly bars (with a text alternative), MRR kept this year with the kept
+  primary action; opens Check in), 12 weekly bars (with a text alternative), MRR kept this year with the kept
   list, and how it's worked out (the neutral-line sentence appears only when there's a team).
 
 ### Web dashboard
@@ -131,7 +131,7 @@ currencies, trend gaps and kept.
   **Not scheduled.** Suggested pg_cron line:
   `select cron.schedule('mrr-at-risk-weekly', '17 4 * * 1', $$ select public.snapshot_mrr_at_risk(current_date) $$);`
 - **`client_engagement_inputs(t)`:** for coaches. Engagement only, for the clients `can_see_client` allows,
-  with no prices. It feeds Needs attention in connected builds.
+  with no prices. It feeds Check in in connected builds.
 - `20261024010001_coach_check_in.sql` adds function comments naming who each is for; no schema change.
 - **Tests:** `tests/86_atrisk.test.sql` (per-currency figures, the two-week rule, role refusals, tenant isolation,
   no health tables in function bodies, snapshot RLS, coach inputs scoped to their clients) and

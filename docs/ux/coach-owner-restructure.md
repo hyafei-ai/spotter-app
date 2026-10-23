@@ -169,3 +169,9 @@ Maya has 8 clients, no team. It's Monday.
 | Visual quality (art direction) | 4 | Hairlines, warm neutrals, brand only on the primary button and the urgent rule; works in dark |
 | Phone-width web | 4 | No horizontal scroll at 390; tables scroll in place |
 | **Overall** | **4** | |
+
+## Decision after review (Oct 24)
+Issue 1 resolved: the "Needs attention" filter is renamed **Check in**. "Needs you" stays for things waiting on the
+coach (messages, form checks, payments, follow-ups); "Check in" is who could use a conversation. The same three words
+(Act today / Check in / Celebrate) will group the coach's Today home (`docs/ux/first-value.md`). Issues 2 and 3
+(repeated facts; two ways to close the loop) are folded into that home rebuild.

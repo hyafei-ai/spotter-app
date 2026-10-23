@@ -15,7 +15,7 @@ const shortDate = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00Z`).toL
  * K-3 client detail → what the client shared between sessions (reads, fuel check, pain, progress,
  * cycle phase), with what to ask. Only what they chose to share; nothing else is shown or implied.
  *
- * When the client is on Clients → Needs attention, this becomes the check-in card: the level, the
+ * When the client is on Clients → Check in, this becomes the check-in card: the level, the
  * reasons (engagement first, then the shared signals), what to ask, and "I checked in". It's the only
  * place a check-in is logged, so the reasons are never shown twice.
  *
