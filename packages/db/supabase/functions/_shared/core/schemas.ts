@@ -365,7 +365,7 @@ export const Mutation = z.discriminatedUnion('kind', [
             date: isoDate,
             startedAt: isoDateTime,
             durationMin: z.number().min(0).max(1440),
-            activity: z.enum(['run', 'walk', 'hike', 'ride', 'swim', 'row', 'strength', 'hiit', 'yoga', 'pilates', 'dance', 'class', 'other']),
+            activity: z.enum(['run', 'walk', 'hike', 'ride', 'swim', 'row', 'strength', 'hiit', 'yoga', 'pilates', 'dance', 'class', 'other', 'flexibility', 'mind_and_body']),
             activeKcal: z.number().min(0).max(20000).nullable(),
             distanceM: z.number().min(0).max(1_000_000).nullable(),
             avgHr: z.number().min(20).max(250).nullable(),
@@ -379,6 +379,20 @@ export const Mutation = z.discriminatedUnion('kind', [
         .max(100),
     }),
   }),
+  // Mobility (docs/features/patterns.md): a quick "Did mobility" log. Training data, shared with the coach like sessions.
+  z.object({
+    ...base,
+    kind: z.literal('mobility.log'),
+    payload: z.object({
+      mobilityId: uuid,
+      date: isoDate,
+      minutes: z.number().int().min(1).max(240),
+      kind: z.enum(['routine', 'yoga', 'stretching', 'pilates', 'other']),
+      routineId: z.string().max(80).nullable(),
+      loggedAt: isoDateTime,
+    }),
+  }),
+  z.object({ ...base, kind: z.literal('mobility.delete'), payload: z.object({ mobilityId: uuid, deletedAt: isoDateTime }) }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];

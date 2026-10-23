@@ -49,3 +49,28 @@ in preparation) can replace it by implementing the same interface, with no UI ch
 | Fuelling + energy availability | `fuel.ts` | `docs/features/fuel.md` |
 | Daily brief, wearables, injury, progress | `brief.ts`, `injury.ts`, `progress.ts` | `docs/features/brief.md` |
 | Coach roster + owner MRR at risk | `atrisk.ts` (on `retention.ts`, `signals.ts`) | `docs/features/at-risk.md` |
+
+## Personal patterns and masters motivation
+
+Added Oct 2026, for the trainer as the buyer: see all of a client's data at once and learn, per client, what works.
+
+- **One daily record.** `timeline.ts` joins training (logged and imported), recovery, mobility, nutrition, cycle (only
+  when shared), pain and the daily check into one `ClientDay`; `rosterCell` is its compact form for an all-clients grid.
+- **What works for {client}.** `patterns.ts` compares the client's own days: recovery after heavy sessions, lifts after
+  short nights, effort after short nights, fuelled vs under-fuelled days, weekly volume vs progress, mobility weeks vs
+  soreness, morning vs evening, and the cycle calibration. One statistics rule (Welch z ≥ 1.5 to show), minimum group
+  sizes, and copy that never claims cause. `docs/features/patterns.md`.
+- **Motivation past 40 and 50.** `masters.ts` finds wins when raw PRs stall: era bests ("best in a year"), strength held,
+  rep, volume and density bests, coach-picked capability goals, and health-marker wins from the watch. No population
+  norms; age grading is an interface waiting for a sourced table. `docs/features/masters.md`.
+- **Mobility** is captured in a tap on Today and from the health app (`mobility.ts`, `docs/ux/mobility-capture.md`).
+- **Devices.** `sources.ts` and `docs/features/sources.md`: Apple Health and Health Connect today; direct vendor APIs and
+  aggregator services are documented options, with every vendor capability marked to verify.
+
+| Area | Core | Doc |
+|---|---|---|
+| Daily record + roster cell | `timeline.ts` | `docs/features/patterns.md` |
+| Personal patterns | `patterns.ts` | `docs/features/patterns.md` |
+| Masters motivation | `masters.ts` | `docs/features/masters.md` |
+| Mobility | `mobility.ts` | `docs/ux/mobility-capture.md` |
+| Data sources | `sources.ts` | `docs/features/sources.md` |

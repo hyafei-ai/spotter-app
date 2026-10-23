@@ -248,7 +248,7 @@ export interface HealthNutritionDay {
 }
 
 /** Kinds of workouts imported from the health app, in plain groups. */
-export const IMPORTED_ACTIVITIES = ['run', 'walk', 'hike', 'ride', 'swim', 'row', 'strength', 'hiit', 'yoga', 'pilates', 'dance', 'class', 'other'] as const;
+export const IMPORTED_ACTIVITIES = ['run', 'walk', 'hike', 'ride', 'swim', 'row', 'strength', 'hiit', 'yoga', 'pilates', 'dance', 'class', 'other', 'flexibility', 'mind_and_body'] as const;
 export type ImportedActivity = (typeof IMPORTED_ACTIVITIES)[number];
 export const IMPORTED_ACTIVITY_LABEL: Record<ImportedActivity, string> = {
   run: 'Run',
@@ -264,6 +264,8 @@ export const IMPORTED_ACTIVITY_LABEL: Record<ImportedActivity, string> = {
   dance: 'Dance',
   class: 'Class',
   other: 'Workout',
+  flexibility: 'Stretching',
+  mind_and_body: 'Mind and body',
 };
 
 /** A workout recorded outside Spotter (Apple Watch Workout app, Strava, Garmin…) read from the health app. */

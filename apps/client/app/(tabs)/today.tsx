@@ -9,6 +9,10 @@ import { isFinishedToday, suggestionFor, todayPlan, useApp } from '../../src/sto
 import { DueItems } from '../../src/DueItems';
 import { lookupDay, useAssigned } from '../../src/programs';
 import { TodayRead } from '../../src/daily/TodayRead';
+import { MobilityLog, type MobilitySuggestion } from '../../src/mobility/MobilityLog';
+
+/** MOCK DATA: the coach's rest-day mobility suggestion; real builds read it from the program. */
+const REST_DAY_MOBILITY: MobilitySuggestion = { title: 'Hip and ankle mobility', minutes: 10, routineId: 'mock-hips-ankles' };
 
 /** C-3 Today. Header is the session name, never a greeting. One primary action. */
 export default function Today() {
@@ -104,8 +108,8 @@ export default function Today() {
         <CoachNote name={first ?? ''} text={tenant.coach.restDayLine} />
         <SectionLabel>Optional</SectionLabel>
         {/* MOCK DATA: rest-day tasks come from the coach's program. */}
-        <ListRow title="20-minute walk" subtitle="Any pace" />
-        <ListRow title="Hip and ankle mobility" subtitle="10 minutes" last />
+        <ListRow title="20-minute walk" subtitle="Any pace" last />
+        <MobilityLog suggestion={REST_DAY_MOBILITY} />
         <DueItems />
       </Screen>
     );
@@ -127,6 +131,7 @@ export default function Today() {
           </Text>
         </View>
         <TodayRead />
+        <MobilityLog />
         <DueItems />
       </Screen>
     );

@@ -59,6 +59,8 @@ const ACTIVITY: Partial<Record<WorkoutActivityType, ImportedActivity>> = {
   [WorkoutActivityType.highIntensityIntervalTraining]: 'hiit',
   [WorkoutActivityType.yoga]: 'yoga',
   [WorkoutActivityType.pilates]: 'pilates',
+  [WorkoutActivityType.flexibility]: 'flexibility',
+  [WorkoutActivityType.mindAndBody]: 'mind_and_body',
   [WorkoutActivityType.dance]: 'dance',
   [WorkoutActivityType.cardioDance]: 'dance',
   [WorkoutActivityType.socialDance]: 'dance',

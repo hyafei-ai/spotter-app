@@ -89,6 +89,8 @@ export const ACTIVITY_REGIONS: Record<ImportedActivity, BodyRegion[]> = {
   dance: ['knee', 'ankle', 'foot'],
   class: [],
   other: [],
+  flexibility: [],
+  mind_and_body: [],
 };
 
 /** Exercise id used for a health-app workout in region load: `activity:run`. */

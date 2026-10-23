@@ -44,8 +44,8 @@ const median = (xs: number[]) => {
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-/** Best estimated 1RM per exercise in a session (Epley, sets of 1–12 reps). */
-function bestE1rm(s: CalibrationSession): Map<string, number> {
+/** Best estimated 1RM per exercise in a session (Epley, sets of 1–12 reps). Shared with timeline.ts and masters.ts. */
+export function sessionBestE1rms(s: Pick<CalibrationSession, 'sets'>): Map<string, number> {
   const out = new Map<string, number>();
   for (const set of s.sets) {
     const e = estimatedOneRepMax(set.weightKg, set.reps);
@@ -55,14 +55,15 @@ function bestE1rm(s: CalibrationSession): Map<string, number> {
 }
 
 /**
- * One number per session: how its lifts ran against the athlete's own recent baseline, in %.
- * Null when no lift has a baseline yet. Exported for tests and for the explainer.
+ * Relative performance, the shared helper behind calibration and personal patterns (patterns.ts): for each
+ * session (sorted by date), how its lifts ran against the athlete's own rolling baseline for each lift, in %.
+ * `deltaPct` is null when no lift in the session has a baseline yet. Input order doesn't matter; the
+ * output is sorted by date (stable for sessions on the same date).
  */
-export function sessionDeltas(sessions: CalibrationSession[]): { date: string; deltaPct: number }[] {
+export function relativePerformance<S extends CalibrationSession>(sessions: S[]): { session: S; deltaPct: number | null }[] {
   const sorted = [...sessions].sort((a, b) => a.date.localeCompare(b.date));
-  const bests = sorted.map(bestE1rm);
-  const out: { date: string; deltaPct: number }[] = [];
-  sorted.forEach((s, i) => {
+  const bests = sorted.map(sessionBestE1rms);
+  return sorted.map((s, i) => {
     const t = dayNum(s.date);
     const prior = sorted
       .map((p, j) => ({ p, j }))
@@ -85,9 +86,16 @@ export function sessionDeltas(sessions: CalibrationSession[]): { date: string; d
       if (effort.length) delta += mean(effort);
       deltas.push(delta);
     }
-    if (deltas.length) out.push({ date: s.date, deltaPct: mean(deltas) });
+    return { session: s, deltaPct: deltas.length ? mean(deltas) : null };
   });
-  return out;
+}
+
+/**
+ * One number per session: how its lifts ran against the athlete's own recent baseline, in %.
+ * Sessions with no baseline yet are left out. Exported for tests and for the explainer.
+ */
+export function sessionDeltas(sessions: CalibrationSession[]): { date: string; deltaPct: number }[] {
+  return relativePerformance(sessions).flatMap((r) => (r.deltaPct == null ? [] : [{ date: r.session.date, deltaPct: r.deltaPct }]));
 }
 
 function confidenceFor(n: number, cycles: number, se: number): Confidence {
