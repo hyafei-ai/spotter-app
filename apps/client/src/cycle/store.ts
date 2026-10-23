@@ -185,7 +185,7 @@ export const useCycle = create<CycleState>()(
       };
     },
     {
-      name: `spotter.cycle.${tenant.slug}`,
+      name: `spotter.cycleprofile.${tenant.slug}`, // not spotter.cycle.*: that key is the coach-visible shared doc
       storage: createJSONStorage(() => kv),
       partialize: ({ mode, birthYear, shareWithCoach, periods, symptoms, plannedLoadsFor, publishedOn }) => ({
         mode,

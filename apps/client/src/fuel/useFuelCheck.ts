@@ -1,3 +1,4 @@
+import { useCycleToday } from '../cycle/hooks';
 import { useMemo } from 'react';
 import {
   exerciseForDay,
@@ -60,9 +61,9 @@ export function sessionKcalFor(durationMin: number | null, feel: number | null, 
 }
 
 /**
- * Everything the fuel check needs, from the stores. Cycle, pain and estimated-max trend come from other
- * builds (cycle.ts, injury.ts, progress.ts). TODO-INTEGRATE: pass them in; until then the demo uses the
- * MOCK pain logs and trend from @spotter/core/demo, and real builds pass none.
+ * Everything the fuel check needs, from the stores, including today's cycle estimate (cycle.ts). Pain and
+ * estimated-max trend come from injury.ts and progress.ts. TODO-INTEGRATE: pass them in; until then the demo
+ * uses the MOCK pain logs and trend from @spotter/core/demo, and real builds pass none.
  */
 export function useFuelCheck(): FuelView {
   const settings = useFuel((s) => s.settings);
@@ -72,6 +73,8 @@ export function useFuelCheck(): FuelView {
   const checks = useDaily((s) => s.checks);
   const { days: healthDays, connected } = useHealthIntake();
   const today = localDate();
+  const { estimate: cycleToday } = useCycleToday();
+  const cycle = cycleToday.mode === 'not_tracking' ? null : cycleToday;
 
   return useMemo(() => {
     const ffm = ffmFor(bodyweightKg, settings.bodyFatPct, settings.useEstimate);
@@ -98,12 +101,12 @@ export function useFuelCheck(): FuelView {
       today,
       days,
       ffmKg: ffm?.kg ?? null,
-      cycle: null,
+      cycle,
       painLogs: IS_DEMO ? demoPainLogs() : [],
       e1rmTrendPct: IS_DEMO ? DEMO_E1RM_TREND_PCT : null,
       checks,
       bodyweights: bodyweightKg != null ? [{ date: today, kg: bodyweightKg }] : [],
     });
     return { today, ffm, days, check, healthConnected: connected };
-  }, [settings, bodyweightKg, entries, completed, checks, healthDays, connected, today]);
+  }, [settings, bodyweightKg, entries, completed, checks, healthDays, connected, today, cycle]);
 }
