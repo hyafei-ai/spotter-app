@@ -439,3 +439,165 @@ export function rosterRowText(firstName: string, days: ClientDay[], today: strin
   }
   return `${firstName}: trained ${trained} of ${days.length} days. ${tail}`;
 }
+
+/* ---------- milestones and returning clients (docs/ports.md row 10) ---------- */
+
+/*
+ * From Station Zero's MemberIntelService (pre-class roster cards), re-done for a coach's own clients: these feed
+ * Celebrate (milestones) and Check in (back after a long break). Fixed rather than copied:
+ * - Anniversaries counted years as floor(days ÷ 365), so an anniversary coming up in the next few days showed the
+ *   previous year's number, and the first anniversary never showed in advance. Years here are calendar years.
+ * - A 29 February start date had no anniversary in other years; it falls on 28 February.
+ * - Birthdays are not ported: a training anniversary by start date is the milestone, not a personal date.
+ */
+
+const dayOf = (iso: string) => Math.floor(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / 86_400_000);
+const isoOfDay = (n: number) => new Date(n * 86_400_000).toISOString().slice(0, 10);
+
+/** Session counts worth marking. A product choice of round numbers, not a statistic. */
+export const SESSION_MILESTONES = [10, 25, 50, 100, 150, 200, 250, 300, 400, 500, 750, 1000] as const;
+/** Weeks with the coach worth marking before the first year; after that, each year. */
+export const WEEK_MILESTONES = [4, 12, 26] as const;
+/** A milestone shows for this many days after it happens. */
+export const MILESTONE_WINDOW_DAYS = 7;
+/** Days without a session before a return counts as "back after a break". */
+export const RETURNING_AFTER_DAYS = 60;
+
+export type MilestoneKind = 'sessions' | 'weeks_with_coach' | 'years_with_coach' | 'training_anniversary' | 'first_race';
+
+export interface ClientMilestone {
+  kind: MilestoneKind;
+  /** The day it happened. */
+  date: string;
+  /** To the client: "Your 100th session with Maya". */
+  text: string;
+  /** To the coach, pronoun-free: "100th session". */
+  coachText: string;
+  /** Higher first: more meaningful, then more recent. */
+  weight: number;
+}
+
+const ordinal = (n: number) => {
+  const s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
+  return `${n}${s}`;
+};
+
+/** The calendar date `years` after `start`; 29 February falls on 28 February in other years. */
+function anniversary(start: string, years: number): string {
+  const [y, m, d] = start.slice(0, 10).split('-').map(Number) as [number, number, number];
+  const yy = y + years;
+  const leap = (yy % 4 === 0 && yy % 100 !== 0) || yy % 400 === 0;
+  const day = m === 2 && d === 29 && !leap ? 28 : d;
+  return `${yy}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** Whole calendar years from `start` to `on`, counting the anniversary day itself. */
+function yearsBetween(start: string, on: string): number {
+  let n = Number(on.slice(0, 4)) - Number(start.slice(0, 4));
+  while (n > 0 && dayOf(anniversary(start, n)) > dayOf(on)) n--;
+  return Math.max(0, n);
+}
+
+/**
+ * Milestones that happened in the last 7 days (today included), most meaningful first: a session count reached,
+ * weeks or years with the coach, a training anniversary (by the date they started training, when that's earlier
+ * than starting with this coach), and a first race. Session counts use the client's logged session dates.
+ */
+export function clientMilestones(input: {
+  today: string;
+  /** Dates of the client's logged sessions with this coach (any order; a two-a-day appears twice). */
+  sessionDates: string[];
+  /** When they started with this coach. */
+  coachStart: string | null;
+  /** When they started training at all, if the client gave it. */
+  trainingStart?: string | null;
+  /** Races they've done, any order. */
+  raceDates?: string[];
+  /** The coach's first name, for the client's text. */
+  coach: string;
+}): ClientMilestone[] {
+  const t = dayOf(input.today);
+  const inWindow = (d: string) => t - dayOf(d) >= 0 && t - dayOf(d) < MILESTONE_WINDOW_DAYS;
+  const out: ClientMilestone[] = [];
+
+  const dates = input.sessionDates.filter((d) => dayOf(d) <= t).sort((a, b) => dayOf(a) - dayOf(b));
+  for (const n of SESSION_MILESTONES) {
+    const d = dates[n - 1];
+    if (d && inWindow(d)) out.push({ kind: 'sessions', date: d, text: `Your ${ordinal(n)} session with ${input.coach}`, coachText: `${ordinal(n)} session`, weight: 40 + Math.min(40, n / 10) });
+  }
+
+  if (input.coachStart) {
+    const s = dayOf(input.coachStart);
+    for (const w of WEEK_MILESTONES) {
+      const d = isoOfDay(s + w * 7);
+      if (inWindow(d)) out.push({ kind: 'weeks_with_coach', date: d, text: `${w} weeks training with ${input.coach}`, coachText: `${w} weeks with you`, weight: 30 + w / 2 });
+    }
+    const years = yearsBetween(input.coachStart, input.today);
+    if (years >= 1) {
+      const d = anniversary(input.coachStart, years);
+      if (inWindow(d)) {
+        const y = years === 1 ? '1 year' : `${years} years`;
+        out.push({ kind: 'years_with_coach', date: d, text: `${y} training with ${input.coach}`, coachText: `${y} with you`, weight: 70 + years });
+      }
+    }
+  }
+
+  const ts = input.trainingStart;
+  if (ts && (!input.coachStart || dayOf(ts) < dayOf(input.coachStart))) {
+    const years = yearsBetween(ts, input.today);
+    if (years >= 1) {
+      const d = anniversary(ts, years);
+      if (inWindow(d)) {
+        const y = years === 1 ? '1 year' : `${years} years`;
+        out.push({ kind: 'training_anniversary', date: d, text: `${y} since you started training`, coachText: `${y} since starting training`, weight: 50 + years });
+      }
+    }
+  }
+
+  const races = (input.raceDates ?? []).filter((d) => dayOf(d) <= t).sort((a, b) => dayOf(a) - dayOf(b));
+  if (races[0] && inWindow(races[0])) out.push({ kind: 'first_race', date: races[0], text: 'Your first race, done', coachText: 'First race done', weight: 90 });
+
+  return out.sort((a, b) => b.weight - a.weight || dayOf(b.date) - dayOf(a.date));
+}
+
+/** The prefilled message for a milestone (the coach edits before sending). */
+export function milestoneMessage(firstName: string, m: Pick<ClientMilestone, 'kind' | 'text'>): string {
+  return m.kind === 'first_race'
+    ? `${firstName}, your first race is done. Proud of you. How are the legs?`
+    : `${firstName}, worth marking: ${m.text.charAt(0).toLowerCase()}${m.text.slice(1)}. That's the work adding up.`;
+}
+
+export interface ReturningClient {
+  /** Days between the last session before the break and the session that ended it. */
+  daysAway: number;
+  lastBefore: string;
+  returnedOn: string;
+  /** For the Check in row: "Back after 9 weeks away". */
+  line: string;
+  /** The question to ask (checkInMessage adds the greeting). */
+  question: string;
+}
+
+/**
+ * A client who came back in the last 7 days after 60 or more days without a session: a Check in input, so the
+ * coach can ask how they're doing and set the first weeks back sensibly. Null otherwise.
+ */
+export function returningAfterBreak(sessionDates: string[], today: string): ReturningClient | null {
+  const t = dayOf(today);
+  const days = [...new Set(sessionDates.map(dayOf))].filter((d) => d <= t).sort((a, b) => a - b);
+  for (let i = days.length - 1; i >= 1; i--) {
+    const back = days[i]!;
+    if (t - back >= MILESTONE_WINDOW_DAYS) return null;
+    const gap = back - days[i - 1]!;
+    if (gap >= RETURNING_AFTER_DAYS) {
+      return {
+        daysAway: gap,
+        lastBefore: isoOfDay(days[i - 1]!),
+        returnedOn: isoOfDay(back),
+        line: `Back after ${Math.floor(gap / 7)} weeks away`,
+        question: 'Welcome back! How are you feeling, and what would you like from the next few weeks?',
+      };
+    }
+  }
+  return null;
+}

@@ -38,3 +38,8 @@ export * from './masters';
 export * from './sources';
 export * from './bodyview';
 export * from './coachToday';
+export * from './parse';
+export * from './templates';
+export * from './hyrox';
+export * from './race';
+export * from './endurance';

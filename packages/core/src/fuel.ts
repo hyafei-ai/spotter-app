@@ -74,18 +74,76 @@ export function exerciseKcalEstimate(session: { durationMin: number; feel: numbe
   return { kcal, source: 'estimate', note: `Estimated: ${minutes} min of strength training at about ${met} METs` };
 }
 
+/* ---------- heart-rate estimate (Keytel et al. 2005), ported from Station Zero's calories.ts ---------- */
+
 /**
- * A day's exercise energy: the wearable's active kcal during workouts when there is one, else the
- * MET estimate summed over that day's sessions, else null (rest day or nothing known).
+ * Keytel et al. 2005 ("Prediction of energy expenditure from heart rate monitoring during submaximal exercise",
+ * J Sports Sci 23(3):289–297), the equations without VO2max, in kJ per minute:
+ *   men:   −55.0969 + 0.6309 × HR + 0.1988 × weight (kg) + 0.2017 × age
+ *   women: −20.4022 + 0.4472 × HR − 0.1263 × weight (kg) + 0.0740 × age
+ * ÷ 4.184 for kcal. Verify coefficients against the paper before relying on them in copy. The source app's
+ * coefficients are kept as they were; they match the commonly cited form.
+ *
+ * Guards kept from the source: average HR outside 90–200 bpm gives no estimate (the source's comment said it
+ * returns nothing outside the range but its code clamped; here it returns nothing, as documented), and more than
+ * 25 kcal a minute is treated as the formula misbehaving. Verify the valid HR range against the paper too.
+ * Changed: with sex unknown the source averaged the two equations; that average isn't a published equation, so
+ * here there is no HR estimate and the MET estimate is used instead.
+ */
+export const KEYTEL_COEFFICIENTS = {
+  male: { intercept: -55.0969, hr: 0.6309, weightKg: 0.1988, age: 0.2017 },
+  female: { intercept: -20.4022, hr: 0.4472, weightKg: -0.1263, age: 0.074 },
+} as const;
+export const KEYTEL_HR_RANGE = { min: 90, max: 200 } as const;
+export const KEYTEL_MAX_KCAL_PER_MIN = 25;
+const KJ_PER_KCAL = 4.184;
+
+export interface HrPerson {
+  weightKg: number | null;
+  age: number | null;
+  sex: 'male' | 'female' | null;
+}
+
+/**
+ * Gross energy (kcal) for a session from its average heart rate, or null when an input is missing or out of
+ * range. Gross includes resting energy; `exerciseKcalEstimateHr` takes resting off for energy availability.
+ */
+export function keytelKcal(durationMin: number, avgHr: number | null, person: HrPerson): number | null {
+  const { weightKg, age, sex } = person;
+  if (!(durationMin > 0) || avgHr == null || !sex || !(weightKg != null && weightKg > 0) || !(age != null && age > 0)) return null;
+  if (avgHr < KEYTEL_HR_RANGE.min || avgHr > KEYTEL_HR_RANGE.max) return null;
+  const c = KEYTEL_COEFFICIENTS[sex];
+  const kcalPerMin = (c.intercept + c.hr * avgHr + c.weightKg * weightKg + c.age * age) / KJ_PER_KCAL;
+  if (!Number.isFinite(kcalPerMin) || kcalPerMin <= 0 || kcalPerMin > KEYTEL_MAX_KCAL_PER_MIN) return null;
+  return Math.round(kcalPerMin * durationMin);
+}
+
+/**
+ * Exercise energy for one session: from average heart rate (Keytel, less one MET of resting energy so it matches
+ * the MET estimate's "above resting" basis) when heart rate, weight, age and sex are known, else the MET estimate.
+ */
+export function exerciseKcalEstimateHr(session: { durationMin: number; feel: number | null; avgHr?: number | null }, bodyweightKg: number, person?: Omit<HrPerson, 'weightKg'> | null): ExerciseEstimate {
+  const minutes = Math.max(0, Math.round(session.durationMin));
+  const gross = person ? keytelKcal(minutes, session.avgHr ?? null, { ...person, weightKg: bodyweightKg }) : null;
+  if (gross == null) return exerciseKcalEstimate(session, bodyweightKg);
+  const resting = bodyweightKg * (minutes / 60);
+  return { kcal: Math.max(0, Math.round(gross - resting)), source: 'estimate', note: `Estimated from heart rate: ${minutes} min at an average of ${Math.round(session.avgHr!)} bpm` };
+}
+
+/**
+ * A day's exercise energy: the wearable's active kcal during workouts when there is one, else the estimate summed
+ * over that day's sessions (from heart rate when `person` and a session's average HR are known, else METs), else
+ * null (rest day or nothing known).
  */
 export function exerciseForDay(
-  sessions: { durationMin: number; feel: number | null }[],
+  sessions: { durationMin: number; feel: number | null; avgHr?: number | null }[],
   bodyweightKg: number | null,
   wearableWorkoutKcal: number | null,
+  person?: Omit<HrPerson, 'weightKg'> | null,
 ): Pick<EnergyDay, 'exerciseKcal' | 'exerciseSource'> {
   if (wearableWorkoutKcal != null && wearableWorkoutKcal > 0) return { exerciseKcal: Math.round(wearableWorkoutKcal), exerciseSource: 'wearable' };
   if (!sessions.length || bodyweightKg == null) return { exerciseKcal: sessions.length ? null : 0, exerciseSource: null };
-  const kcal = sessions.reduce((n, s) => n + exerciseKcalEstimate(s, bodyweightKg).kcal, 0);
+  const kcal = sessions.reduce((n, s) => n + exerciseKcalEstimateHr(s, bodyweightKg, person).kcal, 0);
   return { exerciseKcal: kcal, exerciseSource: 'estimate' };
 }
 

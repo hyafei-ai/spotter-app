@@ -253,9 +253,10 @@ describe('demo seed', () => {
 describe('library', () => {
   it('searches by word starts and filters by tag and equipment', () => {
     expect(searchLibrary(STARTER_LIBRARY, 'squat').map((e) => e.id)).toContain('bulgarian-split-squat');
-    expect(searchLibrary(STARTER_LIBRARY, 'db row').length).toBe(0);
+    // "DB row" is an alias now (ports.md row 3), so the shorthand finds the one-arm row.
+    expect(searchLibrary(STARTER_LIBRARY, 'db row').map((e) => e.id)).toEqual(['db-row']);
     expect(searchLibrary(STARTER_LIBRARY, 'dumb row').map((e) => e.id)).toEqual(['db-row']);
-    expect(searchLibrary(STARTER_LIBRARY, '', { tag: 'carry' }).map((e) => e.id)).toEqual(['farmer-carry', 'suitcase-carry']);
+    expect(searchLibrary(STARTER_LIBRARY, '', { tag: 'carry' }).map((e) => e.id)).toEqual(['farmer-carry', 'sandbag-carry', 'suitcase-carry']);
     expect(searchLibrary(STARTER_LIBRARY, 'press', { equipment: 'cable' }).map((e) => e.id)).toEqual(['pallof-press']);
   });
 
