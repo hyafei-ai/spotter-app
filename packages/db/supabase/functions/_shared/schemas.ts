@@ -250,6 +250,42 @@ export const Mutation = z.discriminatedUnion('kind', [
     kind: z.literal('session.variant'),
     payload: z.object({ sessionId: uuid, variant: z.enum(['planned', 'lighter', 'recovery']) }),
   }),
+  // Cycle tracking (docs/features/cycle.md). Private to the client; the coach only ever gets the shared
+  // projection (today's phase + calibration summary) through cycle_shared_for_coach, and only when shared.
+  z.object({
+    ...base,
+    kind: z.literal('cycle.profile.set'),
+    payload: z.object({
+      mode: z.enum(['natural', 'hormonal', 'irregular', 'perimenopause', 'postmenopause', 'not_tracking', 'pregnant_postpartum']),
+      birthYear: z.number().int().min(1900).max(2100).nullable(),
+      shareWithCoach: z.boolean(),
+      /** Computed on the phone: today's estimated phase and the calibration summary. */
+      todayPhase: z.enum(['menstrual', 'follicular', 'ovulation', 'luteal']).nullable(),
+      todayPhaseOn: isoDate.nullable(),
+      calibrationSummary: z
+        .object({ method: z.string().max(80), ready: z.boolean(), summary: z.string().max(600), appliedPctToday: z.number().min(-5).max(5) })
+        .nullable(),
+      updatedAt: isoDateTime,
+    }),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal('cycle.period.upsert'),
+    payload: z.object({ periodId: uuid, start: isoDate, end: isoDate.nullable(), source: z.enum(['manual', 'health']), updatedAt: isoDateTime }),
+  }),
+  z.object({ ...base, kind: z.literal('cycle.period.delete'), payload: z.object({ periodId: uuid, deletedAt: isoDateTime }) }),
+  z.object({
+    ...base,
+    kind: z.literal('cycle.symptoms.log'),
+    payload: z.object({
+      date: isoDate,
+      scores: z.partialRecord(
+        z.enum(['hot_flashes', 'night_sweats', 'poor_sleep', 'joint_aches', 'low_mood', 'brain_fog', 'cramps', 'bloating', 'headache']),
+        z.number().int().min(0).max(3),
+      ),
+      loggedAt: isoDateTime,
+    }),
+  }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];
