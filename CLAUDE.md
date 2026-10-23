@@ -27,6 +27,11 @@ feature area, or a change to navigation), run the `anthropic-skills:app-ux-impro
 
 A change isn't finished until its UX record exists in `docs/ux/` and its screenshots were actually looked at.
 
+## Reusing Station Zero code (hyafei-ai/hybrid-fitness)
+The product owner's previous app is a source of proven logic, not of UX. Port logic into `packages/core` with tests
+(or re-implement the idea in Spotter's architecture); never copy its screens or navigation. Record what was taken and
+why in `docs/ports.md`. Every ported feature still goes through the UX gate above. Never commit to that repo.
+
 ## Product rules
 - Plain English. Explain, don't score. Screening, never diagnosis. No invented statistics.
 - Health data (cycle, symptoms, fuelling, pain) is the client's; their coach sees it only when shared.
