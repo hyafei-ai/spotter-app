@@ -12,7 +12,6 @@ import { demoImportedWorkouts, demoNutritionDays, demoWearableDays } from '@spot
 import { kv } from '../storage';
 import { syncQueue } from '../sync';
 import { IS_DEMO, tenant } from '../env';
-import { useDaily } from '../daily/store';
 import { health } from './source';
 import { useHealthStatus } from './HealthRow';
 
@@ -43,6 +42,9 @@ interface HealthImportState {
   periods: HealthPeriod[];
   /** Activity types the athlete turned off in Me → Health app. */
   hiddenActivities: ImportedActivity[];
+  /** Who sees what: whether the coach sees imported workouts (type, date, duration, distance; never heart rate). */
+  shareImported: boolean;
+  setShareImported(on: boolean): Promise<void>;
   /** Cycle data is only read after this is granted, from turning cycle tracking on. */
   cycleAccess: 'granted' | 'denied' | null;
   origin: DataOrigin;
@@ -68,6 +70,7 @@ export const useHealthImports = create<HealthImportState>()(
     (set, get) => ({
       ...(IS_DEMO ? mock() : { wearableDays: NO_WEARABLE_DAYS, nutritionDays: NO_NUTRITION_DAYS, workouts: NO_WORKOUTS, periods: NO_PERIODS, origin: 'none' as const }),
       hiddenActivities: [],
+      shareImported: true,
       cycleAccess: null,
       readAt: null,
 
@@ -89,7 +92,7 @@ export const useHealthImports = create<HealthImportState>()(
           // The athlete's own rows only; the coach never reads raw wearable data.
           const days = wearableDays.filter((d) => d.hrvMs != null || d.restingHr != null || d.sleepHours != null || d.activeKcal != null);
           if (days.length) await syncQueue.enqueue('wearable.days', { days: days.slice(-60) });
-          const share = useDaily.getState().settings.shareDefault;
+          const share = get().shareImported;
           const hidden = new Set(get().hiddenActivities);
           const shown = workouts.filter((w) => !hidden.has(w.activity));
           if (shown.length) {
@@ -117,6 +120,12 @@ export const useHealthImports = create<HealthImportState>()(
         return refreshing;
       },
 
+      async setShareImported(on) {
+        set({ shareImported: on });
+        // Re-sending the imports updates share_with_coach on the rows already synced.
+        if (useHealthStatus.getState().status === 'connected') await get().refresh();
+      },
+
       setActivityOn(a, on) {
         const hidden = new Set(get().hiddenActivities);
         if (on) hidden.delete(a);
@@ -136,7 +145,8 @@ export const useHealthImports = create<HealthImportState>()(
     {
       name: `spotter.healthImports.${tenant.slug}`,
       storage: createJSONStorage(() => kv),
-      partialize: ({ wearableDays, nutritionDays, workouts, periods, hiddenActivities, cycleAccess, origin, readAt }) => ({
+      partialize: ({ wearableDays, nutritionDays, workouts, periods, hiddenActivities, shareImported, cycleAccess, origin, readAt }) => ({
+        shareImported,
         wearableDays,
         nutritionDays,
         workouts,

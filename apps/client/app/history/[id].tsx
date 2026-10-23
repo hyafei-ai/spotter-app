@@ -15,7 +15,7 @@ export default function SessionLog() {
     return (
       <Screen>
         <View style={styles.nav}>{back}</View>
-        <EmptyState message="This session isn’t on this phone." actionLabel="Back to History" onAction={() => router.replace('/history')} />
+        <EmptyState message="This session isn’t on this phone." actionLabel="Back to Train" onAction={() => router.replace('/train')} />
       </Screen>
     );
   }

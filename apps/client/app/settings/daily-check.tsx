@@ -1,15 +1,16 @@
-import { Platform, StyleSheet, Switch, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconButton, Screen, SectionLabel, SegmentedControl, Skeleton, Text, useTheme, margin, space, touchMin } from '@spotter/ui';
 import { tenant } from '../../src/env';
 import { useDaily } from '../../src/daily/store';
-import { useHealthImports } from '../../src/health/store';
+import { WhoSeesLink } from '../../src/sharing/WhoSeesLink';
 import { hourLabel } from '../../src/daily/DailyCheckRow';
 
 const HOURS = [6, 7, 8, 9].map((h) => ({ value: String(h), label: hourLabel(h) }));
 
-/** Me → Daily check. Reminder, cycle tracking, default sharing, and exactly what the coach sees. */
+/** Me → Daily check. Reminder and default sharing. Cycle on/off lives in Your cycle; the full list in Who sees what. */
 export default function DailyCheckSettings() {
+  const { colors } = useTheme();
   const hydrated = useDaily((s) => s.hydrated);
   const settings = useDaily((s) => s.settings);
   const setSettings = useDaily((s) => s.setSettings);
@@ -50,27 +51,26 @@ export default function DailyCheckSettings() {
           <SectionLabel>Sharing</SectionLabel>
           <View style={styles.body}>
             <Toggle label={`Share my read with ${first} by default`} value={settings.shareDefault} onChange={(shareDefault) => void setSettings({ shareDefault })} />
-            <Toggle
-              label="Track your cycle (optional, private)"
-              value={settings.cycleTracking}
-              onChange={(cycleTracking) => {
-                void setSettings({ cycleTracking });
-                // Cycle data from the health app is only asked for now, never at the first connect.
-                if (cycleTracking) void useHealthImports.getState().requestCycleAccess();
-              }}
-            />
           </View>
 
-          <SectionLabel>{`What ${first} sees`}</SectionLabel>
           <View style={[styles.body, { gap: space[2] }]}>
             <Text variant="callout">
-              When you share, {first} sees the read: the headline (for example “Train as planned, and keep an eye on it”), the reasons behind it in plain words, any note you add, and the time you checked in.
+              {`When you share, ${first} sees the headline and the reasons in plain words, any note you add, and the time you checked in. Kept private, ${first} only sees that you checked in.`}
             </Text>
-            <Text variant="callout">
-              {first} doesn’t see your cycle phase unless you turn on “Share cycle phase” that day. It’s off every time.
-            </Text>
-            <Text variant="callout">When you keep a day private, {first} only sees that you checked in.</Text>
-            <Text variant="callout">If you pick the easier or recovery version of a session, {first} sees which one in your history.</Text>
+            <WhoSeesLink label="Everything else: Who sees what" />
+          </View>
+
+          <SectionLabel>Cycle</SectionLabel>
+          <View style={[styles.body, { gap: space[2] }]}>
+            <Text variant="callout">Cycle tracking is set up in one place, Your cycle, including whether {first} sees your phase.</Text>
+            <Pressable onPress={() => router.push('/cycle')} accessibilityRole="link" hitSlop={8} style={{ alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }}>
+              <Text variant="bodyStrong" style={{ color: colors.brand }}>
+                Open Your cycle
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={[styles.body, { gap: space[2] }]}>
             <Text variant="caption" color="ink2">
               The read is a guide, not medical advice. It never changes your program by itself: you always choose.
             </Text>

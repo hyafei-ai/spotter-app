@@ -390,9 +390,13 @@ export const Mutation = z.discriminatedUnion('kind', [
       kind: z.enum(['routine', 'yoga', 'stretching', 'pilates', 'other']),
       routineId: z.string().max(80).nullable(),
       loggedAt: isoDateTime,
+      /** Who sees what (client experience build): absent means shared, as before. */
+      shareWithCoach: z.boolean().optional(),
     }),
   }),
   z.object({ ...base, kind: z.literal('mobility.delete'), payload: z.object({ mobilityId: uuid, deletedAt: isoDateTime }) }),
+  // Who sees what: the client turns the coach's view of their mobility logs on or off (all logs, past and future).
+  z.object({ ...base, kind: z.literal('mobility.share.set'), payload: z.object({ shareWithCoach: z.boolean(), updatedAt: isoDateTime }) }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];

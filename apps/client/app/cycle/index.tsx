@@ -23,6 +23,9 @@ import { localDate } from '../../src/nutrition/store';
 import { useCycle, type StoredPeriod } from '../../src/cycle/store';
 import { useCycleToday } from '../../src/cycle/hooks';
 import { readHealthPeriods } from '../../src/cycle/healthPeriods';
+import { useHealthImports } from '../../src/health/store';
+import { WhoSeesLink } from '../../src/sharing/WhoSeesLink';
+import { Explain } from '../../src/explain/Explain';
 
 const MODE_ORDER: CycleMode[] = ['natural', 'hormonal', 'irregular', 'perimenopause', 'postmenopause', 'pregnant_postpartum', 'not_tracking'];
 const MODE_HELP: Record<CycleMode, string> = {
@@ -69,7 +72,7 @@ export default function CycleScreen() {
   const [symptomsOpen, setSymptomsOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState(false);
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/me'));
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/body'));
 
   const attempt = async (fn: () => Promise<unknown>) => {
     setError(false);
@@ -139,6 +142,8 @@ export default function CycleScreen() {
             onPress={() => {
               setModesOpen(false);
               void attempt(() => setMode(m));
+              // Cycle data from the health app is only asked for when tracking turns on, never at first connect.
+              if (m !== 'not_tracking') void useHealthImports.getState().requestCycleAccess();
             }}
           />
         ))
@@ -178,6 +183,7 @@ export default function CycleScreen() {
             <Text variant="caption" color="ink2">
               An estimate from your own logs, not a diagnosis.
             </Text>
+            <Explain term="phase" />
           </View>
         </>
       ) : null}
@@ -260,6 +266,7 @@ export default function CycleScreen() {
                 ? `${first} sees today’s estimated phase and the summary of what your training data shows, including any load change. Never your period dates, symptoms or mode.`
                 : `Off. ${first} sees nothing about your cycle. If you turn it on, ${first} sees only today’s estimated phase and the training-data summary, never period dates or symptoms.`}
             </Text>
+            <WhoSeesLink />
           </View>
         </>
       ) : null}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { BODY_REGION_LABEL, ongoingPain, painText, returnGuidance } from '@spotter/core';
@@ -6,40 +7,50 @@ import { tenant } from '../src/env';
 import { shortDate } from '../src/format';
 import { localDate } from '../src/nutrition/store';
 import { useInjury } from '../src/injury/store';
-import { PainToggle, painLabel } from '../src/injury/PainCheck';
+import { PainCheck, PainToggle, painLabel } from '../src/injury/PainCheck';
+import { WhoSeesLink } from '../src/sharing/WhoSeesLink';
 import { useInjurySignals } from '../src/brief/useBrief';
 
-/** Me → Pain & injuries: what's been logged, conservative return-to-training guidance, sharing per log. */
+/** Body → Pain: what's been logged, conservative return-to-training guidance, sharing per log. */
 export default function Pain() {
   const hydrated = useInjury((s) => s.hydrated);
   const logs = useInjury((s) => s.logs);
   const update = useInjury((s) => s.update);
   const remove = useInjury((s) => s.remove);
+  const painShareDefault = useInjury((s) => s.shareDefault);
   const { regions } = useInjurySignals();
   const first = tenant.coach.name.split(' ')[0] ?? '';
   const today = localDate();
   const ongoing = ongoingPain(logs, today);
   const spikes = regions.filter((r) => r.spike);
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/me'));
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/body'));
   const recent = [...logs].reverse().slice(0, 30);
+  const [logging, setLogging] = useState(false);
 
   return (
-    <Screen>
+    <Screen footer={logging ? <Button label="Cancel" kind="quiet" onPress={() => setLogging(false)} /> : <Button label="Log pain" icon="plus" onPress={() => setLogging(true)} />}>
       <View style={styles.nav}>
         <IconButton icon="arrow-left" label="Back" onPress={back} />
       </View>
       <View style={styles.head}>
         <Text variant="title" accessibilityRole="header">
-          Pain & injuries
+          Pain
         </Text>
-        <Text color="ink2">Log anything that hurts from the daily check. Not a diagnosis.</Text>
+        <Text color="ink2">Log anything that hurts, so you and {first} can work around it. Not a diagnosis.</Text>
+        <WhoSeesLink label={`${painShareDefault ? `${first} sees new logs` : 'New logs are only for you'} · Who sees what`} />
       </View>
+      {logging ? (
+        <View style={[styles.body, { paddingBottom: space[4] }]}>
+          <Text variant="headline">Where does it hurt?</Text>
+          <PainCheck startOpen bare onSaved={() => setLogging(false)} />
+        </View>
+      ) : null}
       {!hydrated ? (
         <View style={styles.body}>
           <Skeleton height={48} />
         </View>
       ) : logs.length === 0 ? (
-        <EmptyState message="Nothing logged. If something starts hurting, add it from today’s check." actionLabel="Open today’s check" onAction={() => router.push('/check-today')} />
+        logging ? null : <EmptyState message="Nothing hurting. If something starts to, log it here or in today’s check." />
       ) : (
         <>
           {ongoing.map((p) => (

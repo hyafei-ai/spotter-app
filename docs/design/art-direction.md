@@ -68,7 +68,7 @@ Added for this product:
 
 ## 8. Navigation & screen inventory
 
-**Client** tabs: Today · History · Coach · Me. Nutrition, check-ins and form checks open from Today's due list or from a set row, never as extra tabs. The logger is a full-screen modal stack with no tab bar.
+**Client** tabs: Today · Train · Body · Coach · Me (Oct 2026, `docs/ux/client-experience.md`; History lives in Train). Nutrition, check-ins and form checks open from Today's due list or from a set row, never as extra tabs. The logger is a full-screen modal stack with no tab bar.
 
 **Coach** tabs: Today · Clients · Programs · Grow · Me (Today since Oct 2026, `docs/ux/coach-experience.md`). Client detail and form-check review push onto the Clients stack.
 

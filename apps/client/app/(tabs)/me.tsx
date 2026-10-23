@@ -5,7 +5,7 @@ import { DEMO_CLIENT } from '@spotter/core/demo';
 import { COACH_URL, IS_DEMO, tenant } from '../../src/env';
 import { setDemoOffline } from '../../src/sync';
 import { useApp, type TodayMode } from '../../src/store';
-import { MeRows } from '../../src/MeRows';
+import { AccountRows, ME_CONNECTION_ROWS, ME_PLAN_ROWS, MeRows } from '../../src/MeRows';
 
 /** C-10 Me. Demo builds add demo controls and "Switch to coach view". */
 export default function Me() {
@@ -30,17 +30,25 @@ export default function Me() {
         ) : undefined
       }
     >
-      <ScreenHeader title="Me" />
-      <ListRow title={DEMO_CLIENT.name} subtitle={DEMO_CLIENT.email} />
-      <ListRow title="Units" subtitle={tenant.units === 'kg' ? 'Kilograms (set by your coach)' : 'Pounds (set by your coach)'} />
+      <ScreenHeader title="Me" subtitle="Your account. How your body is doing lives on Body." />
+      <ListRow title={DEMO_CLIENT.name} subtitle={`${DEMO_CLIENT.email} · ${tenant.units === 'kg' ? 'kilograms' : 'pounds'} (set by your coach)`} />
+
+      <SectionLabel>Plan</SectionLabel>
+      <MeRows rows={ME_PLAN_ROWS} />
+
+      <SectionLabel>Connections and reminders</SectionLabel>
+      <MeRows rows={ME_CONNECTION_ROWS} />
+
+      <SectionLabel>Privacy</SectionLabel>
+      <ListRow title="Who sees what" subtitle={`What ${tenant.coach.name.split(' ')[0]} can and can’t see, with a switch for each`} chevron onPress={() => router.push('/sharing')} />
       <ListRow
         title="Signed waiver"
         subtitle={waiver ? `Signed by ${waiver.signedName}, ${new Date(waiver.signedAt).toLocaleDateString()}` : 'Not signed yet'}
       />
-      <ListRow title="Privacy policy" chevron onPress={() => void Linking.openURL(tenant.privacyPolicyUrl)} />
+      <ListRow title="Privacy policy" chevron last onPress={() => void Linking.openURL(tenant.privacyPolicyUrl)} />
 
-      {/* Notifications, Export my data and Delete account come from MeRows (platform). */}
-      <MeRows />
+      {/* Notifications, Export my data, Delete account and Sign out. */}
+      <AccountRows />
 
       {IS_DEMO ? (
         <>
