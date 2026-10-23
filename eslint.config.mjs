@@ -15,4 +15,10 @@ export default [
     },
   },
   { files: ['**/*.config.js', '**/*.cjs', 'scripts/**/*.js'], rules: { '@typescript-eslint/no-require-imports': 'off' } },
+  // Expo config plugins run in Node as CommonJS.
+  {
+    files: ['apps/*/plugins/**/*.js'],
+    languageOptions: { globals: { __dirname: 'readonly', require: 'readonly', module: 'writable' } },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
 ];

@@ -38,3 +38,4 @@ export * from './masters';
 export * from './sources';
 export * from './bodyview';
 export * from './coachToday';
+export * from './watch';

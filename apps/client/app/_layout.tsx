@@ -8,6 +8,7 @@ import { startSync, setDemoOffline } from '../src/sync';
 import { useApp } from '../src/store';
 import { initRuntimeTenant, useRuntimeTenant } from '../src/runtimeTenant';
 import { Lifecycle } from '../src/platform/Lifecycle';
+import { WatchSync } from '../src/watch/WatchSync';
 
 initObservability({ app: 'client', tenantSlug: BUILD_TENANT.slug, release: APP_VERSION });
 configureForegroundNotifications();
@@ -26,6 +27,7 @@ export default function RootLayout() {
     // Keyed by tenant so a trainer code (shared app) or a brand change re-themes every screen.
     <AppProviders key={rev} tenant={tenant} ready={ready}>
       <Lifecycle />
+      <WatchSync />
       <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
         <Stack.Screen name="session/[id]/index" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }} />
         <Stack.Screen name="session/[id]/finish" options={{ gestureEnabled: false }} />

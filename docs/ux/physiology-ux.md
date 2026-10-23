@@ -204,8 +204,8 @@ kept value. Teams only: a neutral line and "Ask {assistant}" for a client an ass
 2. *In session:* current exercise, set n of m, calibrated target load and reps, rest timer with haptic, log reps and RPE
    with the crown, heart rate. Works offline; syncs through the phone.
 3. *Coach messages:* read and reply with dictation or quick replies.
-Needs: the existing watch app's code, and a native build pipeline (Xcode / EAS with a watch target). Can't be built or
-verified in this environment.
+Built Oct 2026: `docs/ux/watch.md` (UX record) and `docs/features/watch.md` (contract, HR reliability, white-label). The Swift was
+not compiled or run in this environment.
 
 **Cross-domain data engine.** "Sharpens with every athlete" should mean **better starting points**, not pooled personal
 data shown to anyone: cohort priors (e.g. typical first-cycle adjustment for athletes in the same mode) that each

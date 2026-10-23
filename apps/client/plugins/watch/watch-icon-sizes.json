@@ -1,0 +1,22 @@
+{
+  "_comment": "watchOS app icon slots (Xcode asset catalog). px is the PNG size. Read by scripts/make-tenant-icons.py (renders the PNGs) and plugins/withSpotterWatch.js (writes Contents.json). Verify against the current Xcode when building: newer Xcode also accepts a single 1024 px watchOS icon.",
+  "images": [
+    { "size": "24x24", "scale": "2x", "role": "notificationCenter", "subtype": "38mm", "px": 48 },
+    { "size": "27.5x27.5", "scale": "2x", "role": "notificationCenter", "subtype": "42mm", "px": 55 },
+    { "size": "33x33", "scale": "2x", "role": "notificationCenter", "subtype": "45mm", "px": 66 },
+    { "size": "29x29", "scale": "2x", "role": "companionSettings", "px": 58 },
+    { "size": "29x29", "scale": "3x", "role": "companionSettings", "px": 87 },
+    { "size": "40x40", "scale": "2x", "role": "appLauncher", "subtype": "38mm", "px": 80 },
+    { "size": "44x44", "scale": "2x", "role": "appLauncher", "subtype": "40mm", "px": 88 },
+    { "size": "46x46", "scale": "2x", "role": "appLauncher", "subtype": "41mm", "px": 92 },
+    { "size": "50x50", "scale": "2x", "role": "appLauncher", "subtype": "44mm", "px": 100 },
+    { "size": "51x51", "scale": "2x", "role": "appLauncher", "subtype": "45mm", "px": 102 },
+    { "size": "54x54", "scale": "2x", "role": "appLauncher", "subtype": "49mm", "px": 108 },
+    { "size": "86x86", "scale": "2x", "role": "quickLook", "subtype": "38mm", "px": 172 },
+    { "size": "98x98", "scale": "2x", "role": "quickLook", "subtype": "42mm", "px": 196 },
+    { "size": "108x108", "scale": "2x", "role": "quickLook", "subtype": "44mm", "px": 216 },
+    { "size": "117x117", "scale": "2x", "role": "quickLook", "subtype": "45mm", "px": 234 },
+    { "size": "129x129", "scale": "2x", "role": "quickLook", "subtype": "49mm", "px": 258 },
+    { "size": "1024x1024", "scale": "1x", "idiom": "watch-marketing", "px": 1024 }
+  ]
+}
