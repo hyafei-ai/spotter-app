@@ -8,7 +8,9 @@ import {
   PORTION_KEYS,
   PORTION_LABEL,
   groupByMeal,
+  intakeForDay,
   sumMacros,
+  trainingDayTargetKcal,
   sumPortions,
   type FoodLogEntry,
   type Habit,
@@ -24,6 +26,12 @@ import { tenant } from '../../src/env';
 import { useNutritionSetup } from '../../src/nutrition/setup';
 import { localDate, mealForNow, useNutrition } from '../../src/nutrition/store';
 import { dayLabel, g, kcal, leftOrOver, portionCount, shiftDay } from '../../src/nutrition/format';
+import { isOn } from '../../src/modules';
+import { isFinishedToday, todayPlan, useApp } from '../../src/store';
+import { useFuel } from '../../src/fuel/store';
+import { healthProvider, useHealthIntake } from '../../src/fuel/healthIntake';
+import { healthDay, sessionKcalFor, spotterDay } from '../../src/fuel/useFuelCheck';
+import { FuelNutritionRow } from '../../src/fuel/FuelRows';
 
 /** C-8 daily nutrition: logged food against the coach's targets, plus habits. Nutrition-off shows habits only. */
 export default function Nutrition() {
@@ -33,6 +41,7 @@ export default function Nutrition() {
   const entries = useNutrition((s) => s.entries);
   const day = useMemo(() => entries.filter((e) => e.date === date), [entries, date]);
   const first = tenant.coach.name.split(' ')[0];
+  const fuel = useTrainingDayAndHealth(date, today, day);
 
   const back = (
     <IconButton icon="arrow-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/today'))} />
@@ -85,7 +94,19 @@ export default function Nutrition() {
         </View>
       </View>
 
-      {mode === 'macros' && setup.targets.macros ? <MacroSummary logged={sumMacros(day)} target={setup.targets.macros} /> : null}
+      {mode !== 'off' && fuel.health ? <HealthTotals label={fuel.health.label} app={fuel.health.app} kcalTotal={fuel.health.macros.kcal} /> : null}
+      {mode === 'macros' && setup.targets.macros && fuel.trainingKcal ? (
+        <Text variant="callout" color="ink2" style={styles.body}>
+          {`Training day: target +${kcal(trainingDayTargetKcal(setup.targets.macros.kcal, fuel.trainingKcal) - setup.targets.macros.kcal)} (estimated for ${fuel.finished ? 'the session you did' : 'today’s session'})`}
+        </Text>
+      ) : null}
+      {mode === 'macros' && setup.targets.macros ? (
+        <MacroSummary
+          logged={fuel.health?.macros ?? sumMacros(day)}
+          target={{ ...setup.targets.macros, kcal: trainingDayTargetKcal(setup.targets.macros.kcal, fuel.trainingKcal) }}
+        />
+      ) : null}
+      {mode !== 'off' && isOn('nutrition') && isToday ? <FuelNutritionRow /> : null}
       {mode === 'portions' && setup.targets.portions ? <PortionCounters logged={sumPortions(day)} target={setup.targets.portions} date={date} entries={day} /> : null}
 
       {mode !== 'off' ? (
@@ -97,6 +118,51 @@ export default function Nutrition() {
 
       <Habits habits={setup.habits} date={date} coachName={first ?? 'your coach'} offMode={mode === 'off'} />
     </Screen>
+  );
+}
+
+/**
+ * Food already in the health store for this day (from apps like MyMacros), used instead of Spotter's
+ * log when the fuel settings prefer it, and the extra energy a training day needs.
+ */
+function useTrainingDayAndHealth(date: string, today: string, day: FoodLogEntry[]) {
+  const intakeSource = useFuel((s) => s.settings.intakeSource);
+  const bodyweightKg = useFuel((s) => s.bodyweightKg);
+  const { days } = useHealthIntake();
+  const completed = useApp((s) => s.completed);
+  const todayMode = useApp((s) => s.demo.todayMode);
+  return useMemo(() => {
+    const h = healthDay(days, date);
+    const chosen = intakeForDay(spotterDay(day, date), h, intakeSource, healthProvider());
+    const health =
+      chosen.source === 'health' && h
+        ? { label: chosen.label ?? '', app: h.sources[0] ?? healthProvider(), macros: { kcal: Math.round(h.kcal), proteinG: h.proteinG, carbsG: h.carbsG, fatG: h.fatG } }
+        : null;
+    let trainingKcal: number | null = null;
+    let finished = false;
+    if (date === today) {
+      const plan = todayPlan(todayMode);
+      const done = isFinishedToday(completed, plan) ?? completed.find((s) => s.date === today);
+      if (done) {
+        finished = true;
+        const minutes = Math.max(0, (Date.parse(done.finishedAt) - Date.parse(done.startedAt)) / 60_000);
+        trainingKcal = sessionKcalFor(minutes, done.feel || null, bodyweightKg);
+      } else if (plan) {
+        trainingKcal = sessionKcalFor(null, null, bodyweightKg);
+      }
+    }
+    return { health, trainingKcal, finished };
+  }, [days, date, today, day, intakeSource, bodyweightKg, completed, todayMode]);
+}
+
+function HealthTotals({ label, app, kcalTotal }: { label: string; app: string; kcalTotal: number }) {
+  return (
+    <View style={[styles.summary, { gap: space[1] }]} accessible accessibilityLabel={`${label}: ${kcal(kcalTotal)}. Logged in ${app}? It’s already here.`}>
+      <Text variant="bodyStrong">{`${label}: ${kcal(kcalTotal)}`}</Text>
+      <Text variant="caption" color="ink2">
+        {`Logged in ${app}? It’s already here, so there’s no need to log it again. Logging in Spotter is optional.`}
+      </Text>
+    </View>
   );
 }
 

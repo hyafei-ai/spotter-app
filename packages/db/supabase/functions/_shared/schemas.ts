@@ -286,6 +286,29 @@ export const Mutation = z.discriminatedUnion('kind', [
       loggedAt: isoDateTime,
     }),
   }),
+  // Fuel check (docs/features/fuel.md): the athlete's settings, and the level they chose to share.
+  z.object({
+    ...base,
+    kind: z.literal('fuel.settings.set'),
+    payload: z.object({
+      bodyFatPct: z.number().min(3).max(70).nullable(),
+      useEstimate: z.boolean(),
+      intakeSource: z.enum(['health', 'spotter', 'auto']),
+      shareWithCoach: z.boolean(),
+      updatedAt: isoDateTime,
+    }),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal('fuel.pattern.share'),
+    payload: z.object({
+      date: isoDate,
+      level: z.enum(['none', 'watch', 'talk_to_someone']),
+      /** The signs' plain text only: never food logs or EA figures. */
+      signs: z.array(z.string().max(200)).max(6),
+      sharedAt: isoDateTime,
+    }),
+  }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];
@@ -318,6 +341,8 @@ export const TriageReason = z.enum([
   'load_spike',
   // Owner asked a coach to check in on a member (docs/features/retention.md).
   'check_in_request',
+  // Fuel check shared at "worth talking to someone" (docs/features/fuel.md).
+  'fuel_pattern',
 ]);
 export type TriageReason = z.infer<typeof TriageReason>;
 

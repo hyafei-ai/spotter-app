@@ -4,6 +4,7 @@ import { SharedTrainerRow } from './SharedTrainerRow';
 import { AccountRows } from './platform/AccountRows';
 import { DailyCheckRow } from './daily/DailyCheckRow';
 import { CycleRow } from './cycle/CycleRow';
+import { FuelMeRow } from './fuel/FuelRows';
 
 /**
  * Extra rows on the client's Me tab (C-10): health app, billing, export, delete, etc.
@@ -17,6 +18,7 @@ const ME_ROWS: React.ComponentType[] = [
   SharedTrainerRow,
   DailyCheckRow,
   CycleRow,
+  FuelMeRow,
   AccountRows, // keep last: notifications, export, delete account, sign out
 ];
 

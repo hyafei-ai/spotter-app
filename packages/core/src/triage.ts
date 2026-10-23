@@ -14,6 +14,7 @@ export const TRIAGE_PRIORITY: Record<TriageReason, number> = {
   sleep_short_streak: 45,
   load_spike: 42,
   check_in_request: 75,
+  fuel_pattern: 62,
 };
 
 export interface TriageItem {
@@ -68,6 +69,8 @@ export function reasonText(item: TriageItem, now: number = Date.now()): string {
       return item.detail ?? 'Training load jumped this week';
     case 'check_in_request':
       return item.detail ?? 'Asked you to check in';
+    case 'fuel_pattern':
+      return 'Fuel check flagged: worth a conversation';
   }
 }
 
