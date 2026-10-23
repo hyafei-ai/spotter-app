@@ -97,7 +97,7 @@ describe('athleteDropoutRisk', () => {
 
   it('ignores easy-day reads on the engagement side (they count only as shared "running tired")', () => {
     const a = activity({ easeReadsRecent: 6, easeReadsBefore: 1 });
-    expect(memberRisk(toSignals(a, today)).points).toBe(1);
+    expect(memberRisk(toSignals(a, today)).points).toBe(0); // owner path drops them too
     expect(athleteDropoutRisk(a, null, today).points).toBe(0);
   });
 

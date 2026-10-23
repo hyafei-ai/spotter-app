@@ -25,6 +25,6 @@ select pg_temp.check(public.raise_sleep_streaks(date '2030-01-03') = 0, 'a priva
 update daily_checks set share_with_coach = true, shared_read = '{"tone":"watch"}' where id = '01900000-0000-7000-8000-00000000d103';
 select pg_temp.check(public.raise_sleep_streaks(date '2030-01-03') = 1, 'three shared short nights raise a streak');
 
--- Easy-day reads count only shared "ease" reads.
-select pg_temp.check(public.ease_reads('a0000000-0000-7000-8000-000000000000', 'a0000000-0000-7000-8000-0000000000c1', date '2030-01-01', date '2030-01-04') = 2,
-  'easy-day reads count shared ease reads only');
+-- Owners never get easy-day reads: they come from health data (20261023090001_physiology_integration.sql).
+select pg_temp.check(public.ease_reads('a0000000-0000-7000-8000-000000000000', 'a0000000-0000-7000-8000-0000000000c1', date '2030-01-01', date '2030-01-04') = 0,
+  'easy-day reads are not counted for owners');

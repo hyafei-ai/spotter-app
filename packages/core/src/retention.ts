@@ -35,8 +35,10 @@ export function toSignals(a: MemberActivity, today: string): MemberSignals {
     weeks: a.weeks,
     daysSinceLastOpen: days(a.lastAppOpenAt, today),
     daysSinceLastSession: days(a.lastSessionAt, today),
-    easeReadsRecent: a.easeReadsRecent,
-    easeReadsBefore: a.easeReadsBefore,
+    // Owner path: easy-day reads come from athletes' daily checks, which owners never see
+    // (docs/physiology.md rule 4). Coaches get tiredness through atrisk.ts, from shared reads only.
+    easeReadsRecent: 0,
+    easeReadsBefore: 0,
     checkInsMissed: a.checkInsMissed,
     paymentIssue: a.subscription?.status === 'past_due' || a.subscription?.status === 'unpaid',
     tenureDays: days(a.joinedAt, today) ?? 0,

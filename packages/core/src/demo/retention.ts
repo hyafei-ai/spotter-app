@@ -23,9 +23,9 @@ type Shape = Omit<MemberActivity, 'clientId' | 'name' | 'planName' | 'coachId' |
 const steady = (planned: number, done: number) => Array.from({ length: 4 }, () => ({ planned, done }));
 
 /**
- * One row per demo client. Chris has dropped off (high), Priya's card failed and she skipped
- * check-ins (medium), Mei has had a rough few weeks (medium). Easy-day reads would come from the
- * athlete daily check; here they're typed in.
+ * One row per demo client. Chris has dropped off (high) and Priya's card failed with check-ins
+ * skipped (medium). Mei has had a rough few weeks: easy-day reads come from the athlete daily check,
+ * so they reach only the coach (as shared "running tired"), never the owner's list.
  */
 const SHAPES: Shape[] = [
   { weeks: steady(3, 3), openedDaysAgo: 1, sessionDaysAgo: 7, easeReadsRecent: 0, easeReadsBefore: 0, checkInsMissed: 0 },

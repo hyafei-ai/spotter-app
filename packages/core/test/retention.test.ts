@@ -83,7 +83,8 @@ describe('membersToTalkTo', () => {
     const by = Object.fromEntries(r.members.map((m) => [m.name, m.risk.level]));
     expect(by['Chris Lindqvist']).toBe('high');
     expect(by['Priya Natarajan']).toBe('medium');
-    expect(by['Mei Tanaka']).toBe('medium');
+    // Mei's rough weeks show up only through what Mei shared with the coach (atrisk.ts), never here.
+    expect(by['Mei Tanaka']).toBeUndefined();
     expect(r.members[0]!.name).toBe('Chris Lindqvist');
     expect(r.members.some((m) => m.name.startsWith('Daniel'))).toBe(false); // paused
   });
