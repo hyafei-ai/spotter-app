@@ -31,10 +31,10 @@ import { useTeam } from '../platform/team';
  * (like shared_reads_for_coach), keyed by the coach-side client id.
  */
 
-export const fuelKey = (slug: string) => `spotter.fuel.${slug}`; // TODO-INTEGRATE: confirm with the fuel build
-export const painKey = (slug: string) => `spotter.pain.${slug}`; // TODO-INTEGRATE: confirm with the injury build
-export const cycleKey = (slug: string) => `spotter.cycle.${slug}`; // TODO-INTEGRATE: confirm with the cycle build
-export const progressKey = (slug: string) => `spotter.progress.${slug}`; // TODO-INTEGRATE: confirm with the progress build
+export const fuelKey = (slug: string) => `spotter.fuel.${slug}`; // FuelSharesDoc (demo/fuel.ts)
+export const painKey = (slug: string) => `spotter.pain.${slug}`; // SharedPainDoc (demo/brief.ts)
+export const cycleKey = (slug: string) => `spotter.cycle.${slug}`; // SharedCycleDoc (demo/cycle.ts)
+export const progressKey = (slug: string) => `spotter.progress.${slug}`; // TODO: the client app doesn't publish this yet; demo/atrisk.ts seeds it
 
 const isDemo = () => !isConfigured() || !supabase;
 const DAY = 86_400_000;
@@ -47,13 +47,13 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /**
- * TODO-INTEGRATE: the per-client entry in a shared doc. Accepts `{ [clientId]: … }` and the wrapped
- * forms `{ byClient | clients | shared: { [clientId]: … } }`. Returns null when the athlete turned
+ * The per-client entry in a shared doc. Accepts `{ [clientId]: … }` and the wrapped forms
+ * `{ byClient | clients | shared | pain: { [clientId]: … } }` (the pain doc wraps its logs under `pain`). Returns null when the athlete turned
  * sharing off for it (`shared: false` or `shareWithCoach: false`).
  */
 export function entryFor(doc: unknown, clientId: string): Obj | unknown[] | null {
   if (!isObj(doc)) return null;
-  const found = [doc[clientId], ...['byClient', 'clients', 'shared'].map((k) => (isObj(doc[k]) ? (doc[k] as Obj)[clientId] : undefined))].find(
+  const found = [doc[clientId], ...['byClient', 'clients', 'shared', 'pain'].map((k) => (isObj(doc[k]) ? (doc[k] as Obj)[clientId] : undefined))].find(
     (v) => v != null,
   );
   if (found == null) return null;

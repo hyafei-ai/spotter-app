@@ -1,50 +1,56 @@
-import type { CalibrationInput, CycleEstimate, FuelPattern, PhaseAdjustment, Symptom } from '@spotter/core';
+import { useCallback, useMemo } from 'react';
+import { estimateCycle, type CalibrationInput, type CycleEstimate, type FuelPattern, type PhaseAdjustment, type Symptom } from '@spotter/core';
+import { useCycleProfile, useCycleToday } from '../cycle/hooks';
+import { useCycle } from '../cycle/store';
+import { useFuelCheck } from '../fuel/useFuelCheck';
+import { useFuel } from '../fuel/store';
+import { localDate } from '../nutrition/store';
 
 /*
- * Adapters for the brief's inputs that other builds own. Each returns null for now, so the brief
- * degrades gracefully (no cycle context, no fuel pattern, no symptoms) until the integrator wires them.
- * Keep the signatures: useBrief, the Progress screen and the shared read depend on them.
+ * The brief's inputs from the cycle and fuel builds. Keep the signatures: useBrief, the Progress screen
+ * and the shared read depend on them.
  */
 
-/** Today's cycle estimate. */
+/** Today's cycle estimate; null when the athlete doesn't track. */
 export function useCycleEstimate(): CycleEstimate | null {
-  // TODO-INTEGRATE: read today's estimate from apps/client/src/cycle/store.ts (cycle.ts estimate for localDate()).
-  return null;
+  const { estimate } = useCycleToday();
+  return estimate.mode === 'not_tracking' ? null : estimate;
 }
 
 /** The calibration for today's phase (only when the calibrator has one for it). */
 export function useCalibrationToday(): PhaseAdjustment | null {
-  // TODO-INTEGRATE: from apps/client/src/cycle/store.ts, the Calibration's adjustment whose phase matches today's estimate.
-  return null;
+  const { estimate, calibration } = useCycleToday();
+  return useMemo(
+    () => (estimate.phase ? (calibration.adjustments.find((a) => a.phase === estimate.phase) ?? null) : null),
+    [estimate.phase, calibration],
+  );
 }
 
 /** The cycle estimate for any past date, for phase-calibrated bests on the Progress screen. */
 export function usePhaseOn(): CalibrationInput['phaseOn'] | null {
-  // TODO-INTEGRATE: apps/client/src/cycle/store.ts phaseOn(date), built from the same period logs.
-  return null;
+  const profile = useCycleProfile();
+  const phaseOn = useCallback((date: string) => estimateCycle(profile, date), [profile]);
+  return profile.mode === 'not_tracking' ? null : phaseOn;
 }
 
-/** Whether the athlete shares their cycle with the coach (CycleProfile.shareWithCoach). */
+/** Whether the athlete shares their cycle with the coach (Your cycle). */
 export function useCycleShared(): boolean {
-  // TODO-INTEGRATE: apps/client/src/cycle/store.ts profile.shareWithCoach. Until then the daily check's
-  // per-day "Share cycle phase" toggle decides (see useBrief).
-  return false;
+  return useCycle((s) => s.shareWithCoach);
 }
 
 /** Today's symptoms, 0 none … 3 severe. */
 export function useSymptomsToday(): Partial<Record<Symptom, number>> | null {
-  // TODO-INTEGRATE: today's symptom log from apps/client/src/cycle/store.ts.
-  return null;
+  const today = localDate();
+  return useCycle((s) => s.symptoms.find((x) => x.date === today)?.scores ?? null);
 }
 
 /** The fuelling pattern from fuel.ts. */
 export function useFuelPattern(): FuelPattern | null {
-  // TODO-INTEGRATE: apps/client/src/fuel/store.ts (fuel pattern for localDate()).
-  return null;
+  const { check } = useFuelCheck();
+  return check.eaBand === 'unknown' && check.level === 'none' ? null : check;
 }
 
-/** Whether the athlete shares fuelling with the coach. Not shared by default. */
+/** Whether the athlete shares the fuel check with the coach. Not shared by default. */
 export function useFuelShared(): boolean {
-  // TODO-INTEGRATE: apps/client/src/fuel/store.ts sharing flag.
-  return false;
+  return useFuel((s) => s.settings.shareWithCoach);
 }

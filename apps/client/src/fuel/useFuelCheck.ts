@@ -1,11 +1,12 @@
-import { useCycleToday } from '../cycle/hooks';
 import { useMemo } from 'react';
 import {
+  e1rmTrend,
   exerciseForDay,
   exerciseKcalEstimate,
   ffmFor,
   fuelPattern,
   intakeForDay,
+  mainLifts,
   sumMacros,
   type DayIntake,
   type EnergyDay,
@@ -19,6 +20,9 @@ import { useApp, type CompletedSession } from '../store';
 import { localDate, useNutrition } from '../nutrition/store';
 import { useDaily } from '../daily/store';
 import { IS_DEMO } from '../env';
+import { useCycleToday } from '../cycle/hooks';
+import { calibrationSessions } from '../cycle/store';
+import { useInjury } from '../injury/store';
 import { healthProvider, useHealthIntake } from './healthIntake';
 import { useFuel } from './store';
 
@@ -61,10 +65,19 @@ export function sessionKcalFor(durationMin: number | null, feel: number | null, 
 }
 
 /**
- * Everything the fuel check needs, from the stores, including today's cycle estimate (cycle.ts). Pain and
- * estimated-max trend come from injury.ts and progress.ts. TODO-INTEGRATE: pass them in; until then the demo
- * uses the MOCK pain logs and trend from @spotter/core/demo, and real builds pass none.
+ * Everything the fuel check needs, from the stores: today's cycle estimate (cycle.ts), pain logs
+ * (injury store) and the main lifts' estimated-max trend (progress.ts). The demo uses MOCK pain logs and
+ * trend from @spotter/core/demo.
  */
+/** The steepest 6-week estimated-max trend across the main lifts, as % (null under 3 sessions a lift). */
+function worstTrendPct(completed: Parameters<typeof calibrationSessions>[0], today: string): number | null {
+  const sessions = calibrationSessions(completed);
+  const slopes = mainLifts(sessions, today)
+    .map((id) => e1rmTrend(sessions, id, today).slopePct)
+    .filter((p): p is number => p != null);
+  return slopes.length ? Math.min(...slopes) : null;
+}
+
 export function useFuelCheck(): FuelView {
   const settings = useFuel((s) => s.settings);
   const bodyweightKg = useFuel((s) => s.bodyweightKg);
@@ -73,6 +86,7 @@ export function useFuelCheck(): FuelView {
   const checks = useDaily((s) => s.checks);
   const { days: healthDays, connected } = useHealthIntake();
   const today = localDate();
+  const painLogs = useInjury((s) => s.logs);
   const { estimate: cycleToday } = useCycleToday();
   const cycle = cycleToday.mode === 'not_tracking' ? null : cycleToday;
 
@@ -102,11 +116,12 @@ export function useFuelCheck(): FuelView {
       days,
       ffmKg: ffm?.kg ?? null,
       cycle,
-      painLogs: IS_DEMO ? demoPainLogs() : [],
-      e1rmTrendPct: IS_DEMO ? DEMO_E1RM_TREND_PCT : null,
+      // MOCK in the demo until the athlete logs pain themselves.
+      painLogs: IS_DEMO && painLogs.length === 0 ? demoPainLogs() : painLogs,
+      e1rmTrendPct: IS_DEMO ? DEMO_E1RM_TREND_PCT : worstTrendPct(completed, today),
       checks,
       bodyweights: bodyweightKg != null ? [{ date: today, kg: bodyweightKg }] : [],
     });
     return { today, ffm, days, check, healthConnected: connected };
-  }, [settings, bodyweightKg, entries, completed, checks, healthDays, connected, today, cycle]);
+  }, [settings, bodyweightKg, entries, completed, checks, healthDays, connected, today, cycle, painLogs]);
 }
