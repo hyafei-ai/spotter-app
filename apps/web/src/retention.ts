@@ -90,10 +90,11 @@ export function loadDemoRetention(now = Date.now()): RetentionData {
     demoMemberActivity(now, coachOf).map((a) => ({ ...a, currency })),
     demoPhysiology(),
     today,
-    { viewerId },
+    // The demo business is a solo coach (the main case): every reason is shown, no hand-offs.
+    { viewerId, solo: true },
   );
   const atRisk = mrrAtRisk(clients.map((m) => ({ monthlyCents: m.monthlyCents, level: m.risk.level, currency: m.currency ?? currency })));
-  const interventions = savedInterventions() ?? demoInterventions(now);
+  const interventions = savedInterventions() ?? demoInterventions(now).map((i) => ({ ...i, coachId: viewerId, coachName: 'Maya Reyes' }));
   const status = memberStatus(demoRetentionSubscriptions(now));
   return {
     source: 'demo',

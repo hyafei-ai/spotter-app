@@ -58,7 +58,8 @@ export default function RetentionPage() {
     void load();
   }, [load]);
 
-  const coaches = data?.source === 'live' ? [] : demoCoaches.filter((c) => c.status === 'active');
+  // Demo: a solo coach. Live: hand-offs come with the team feature's own data.
+  const coaches: typeof demoCoaches = [];
   const solo = coaches.length <= 1;
   const kept = useMemo(() => (data ? keptSummary(data.interventions, data.status, data.year, data.today) : null), [data]);
   const openByClient = useMemo(() => new Map((data?.interventions ?? []).filter((i) => !i.doneOn).map((i) => [i.clientId, i])), [data]);

@@ -16,7 +16,7 @@ import { isConfigured } from '@spotter/ui/platform';
 import { CLIENT_URL, tenant } from '../../src/env';
 import { useIntakeEditor } from '../../src/intakeForm';
 import { MeRows } from '../../src/MeRows';
-import { DEMO_TEAM_IDS, useRole, useTeam } from '../../src/platform/team';
+import { DEMO_TEAM_IDS, readDemoTeam, setDemoTeam, useRole, useTeam } from '../../src/platform/team';
 import { initials } from '../../src/store';
 import { useFirstRunPreview } from '../../src/today/data';
 
@@ -25,6 +25,7 @@ export default function Me() {
   const { isOwner, viewer } = useRole();
   const setViewer = useTeam((s) => s.setViewer);
   const firstRun = useFirstRunPreview();
+  const demoTeam = readDemoTeam();
   const name = viewer?.name ?? tenant.coach.name;
   return (
     <Screen>
@@ -48,6 +49,22 @@ export default function Me() {
           <SectionLabel>Demo</SectionLabel>
           <View style={{ paddingHorizontal: margin, paddingVertical: space[3], gap: space[2] }}>
             <Text variant="label" color="ink2">
+              Your business
+            </Text>
+            <SegmentedControl
+              label="Your business"
+              value={demoTeam ? 'team' : 'solo'}
+              onChange={(v) => setDemoTeam(v === 'team')}
+              options={[
+                { value: 'solo', label: 'Just you' },
+                { value: 'team', label: 'With an assistant' },
+              ]}
+            />
+          </View>
+          {demoTeam ? (
+            <>
+          <View style={{ paddingHorizontal: margin, paddingVertical: space[3], gap: space[2] }}>
+            <Text variant="label" color="ink2">
               View the app as
             </Text>
             <SegmentedControl
@@ -62,6 +79,8 @@ export default function Me() {
               ]}
             />
           </View>
+            </>
+          ) : null}
           <View style={{ paddingHorizontal: margin, paddingBottom: space[3], gap: space[2] }}>
             <Text variant="label" color="ink2">
               First login preview

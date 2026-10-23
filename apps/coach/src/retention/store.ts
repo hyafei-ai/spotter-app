@@ -18,7 +18,7 @@ import { demoInterventions, demoMemberActivity, demoRetentionSubscriptions } fro
 import { isConfigured, supabase } from '@spotter/ui/platform';
 import { tenant } from '../env';
 import { useCoach } from '../store';
-import { useTeam } from '../platform/team';
+import { DEMO_TEAM_IDS, readDemoTeam, useTeam } from '../platform/team';
 import { loadCoachData } from '../platform/serverData';
 
 /*
@@ -118,7 +118,11 @@ export const useRetention = create<RetentionState>((set, get) => ({
     set({ status: get().loadedAt ? 'ready' : 'loading', error: null });
     if (isDemo()) {
       const now = Date.now();
-      const interventions = readSaved() ?? demoInterventions(now);
+      // A solo demo business has no assistant: the sample check-ins are all the coach's own.
+      const solo = !readDemoTeam();
+      const interventions =
+        readSaved() ??
+        demoInterventions(now).map((i) => (solo ? { ...i, coachId: DEMO_TEAM_IDS.OWNER_ID, coachName: tenant.coach.name } : i));
       set({
         status: 'ready',
         activity: demoMemberActivity(now, useTeam.getState().coachOf),

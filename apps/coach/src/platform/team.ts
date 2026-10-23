@@ -36,11 +36,32 @@ const VIEWER_KEY = 'spotter.demoViewer';
 function readDemoViewer(): string {
   try {
     const v = globalThis.localStorage?.getItem(VIEWER_KEY);
-    return v === ASSISTANT_ID ? ASSISTANT_ID : OWNER_ID;
+    return v === ASSISTANT_ID && readDemoTeam() ? ASSISTANT_ID : OWNER_ID;
   } catch {
     return OWNER_ID;
   }
 }
+
+/** Demo: a solo coach by default (the main case); "With an assistant" shows the optional team features. */
+const TEAM_KEY = 'spotter.demoTeam';
+export function readDemoTeam(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(TEAM_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+export function setDemoTeam(on: boolean) {
+  try {
+    globalThis.localStorage?.setItem(TEAM_KEY, on ? '1' : '0');
+    if (!on) globalThis.localStorage?.setItem(VIEWER_KEY, OWNER_ID);
+  } catch {
+    // storage unavailable: nothing to remember
+  }
+  // The demo stores read the team once at start, so reload to apply.
+  (globalThis as { location?: { reload(): void } }).location?.reload();
+}
+const DEMO_TEAM = readDemoTeam();
 
 const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
 
@@ -58,13 +79,13 @@ interface TeamState {
 }
 
 const initialCoachOf: Record<string, string> = Object.fromEntries(
-  DEMO_CLIENTS.map((c, i) => [c.id, i % 3 === 2 ? ASSISTANT_ID : OWNER_ID]),
+  DEMO_CLIENTS.map((c, i) => [c.id, DEMO_TEAM && i % 3 === 2 ? ASSISTANT_ID : OWNER_ID]),
 );
 
 export const useTeam = create<TeamState>((set, get) => ({
   coaches: [
     { id: OWNER_ID, name: tenant.coach.name, email: tenant.supportEmail, role: 'owner', split: 1, status: 'active' },
-    { id: ASSISTANT_ID, name: 'Leo Park', email: 'leo@mayareyes.example', role: 'assistant', split: 0.6, status: 'active' },
+    ...(DEMO_TEAM ? [{ id: ASSISTANT_ID, name: 'Leo Park', email: 'leo@mayareyes.example', role: 'assistant' as const, split: 0.6, status: 'active' as const }] : []),
   ],
   coachOf: initialCoachOf,
   history: Object.fromEntries(
