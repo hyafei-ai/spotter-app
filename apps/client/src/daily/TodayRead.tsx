@@ -6,7 +6,9 @@ import { tenant } from '../env';
 import { localDate } from '../nutrition/store';
 import { useApp } from '../store';
 import { useDaily } from './store';
-import { useLighterRule, useTodayRead } from './read';
+import { useLighterRule } from './read';
+import { useBrief } from '../brief/useBrief';
+import { BriefBody } from '../brief/BriefBody';
 import { lighterPlan, recoveryPlan } from './options';
 
 /** Words carry the meaning; the tag colour only repeats them. */
@@ -15,20 +17,21 @@ export const TONE_TAG: Record<ReadTone, 'success' | 'warning' | 'brand'> = { ste
 
 /**
  * Today's daily check (client JTBD: train around body variance; share the read without extra effort).
- * Above the coach note: the prompt while today's check isn't done, then the read. With `plan`, also the
- * coach's easier and recovery versions when the read suggests it. The client always chooses.
+ * Above the coach note: the prompt while today's check isn't done, then the daily brief ("you're running
+ * tired today, here's why, here's what to do", docs/features/brief.md). With `plan`, also the coach's
+ * easier and recovery versions when the brief suggests it. The client always chooses.
  */
 export function TodayRead({ plan }: { plan?: SessionPlan }) {
   const { colors } = useTheme();
   const hydrated = useDaily((s) => s.hydrated);
   const skippedOn = useDaily((s) => s.skippedOn);
   const skipToday = useDaily((s) => s.skipToday);
-  const { check, read } = useTodayRead();
+  const { check, read, brief } = useBrief(plan);
   const first = tenant.coach.name.split(' ')[0] ?? '';
   if (!hydrated) return null;
 
   const showPrompt = !check && skippedOn !== localDate();
-  const hasRead = !!check || read.factors.length > 0;
+  const hasRead = !!check || read.factors.length > 0 || brief.why.length > 0;
 
   return (
     <View>
@@ -45,20 +48,14 @@ export function TodayRead({ plan }: { plan?: SessionPlan }) {
         </View>
       ) : null}
       {hasRead ? (
-        <View style={[styles.read, { borderLeftColor: colors.line }]} accessibilityLabel={`Today’s read: ${TONE_LABEL[read.tone]}. ${read.headline}`}>
+        <View style={[styles.read, { borderLeftColor: colors.line }]}>
           <View style={styles.row}>
             <Text variant="label" color="ink2">
-              Today’s read
+              Today’s brief
             </Text>
-            <Tag label={TONE_LABEL[read.tone]} tone={TONE_TAG[read.tone]} />
+            <Tag label={TONE_LABEL[brief.tone]} tone={TONE_TAG[brief.tone]} />
           </View>
-          <Text variant="callout">{read.headline}</Text>
-          {read.factors.filter((f) => !read.headline.toLowerCase().includes(f.text.toLowerCase())).map((f) => (
-            <Text key={f.kind} variant="caption" color="ink2">
-              {'· '}
-              {f.text}
-            </Text>
-          ))}
+          <BriefBody brief={brief} />
           <Text variant="caption" color="ink2">
             {!check
               ? 'From the last few nights. Check in to add today.'
@@ -66,7 +63,7 @@ export function TodayRead({ plan }: { plan?: SessionPlan }) {
                 ? `Shared with ${first}${check.cyclePhase && !check.shareCycle ? ' (cycle phase kept private)' : ''}.`
                 : `Kept private. ${first} won’t see today’s read.`}
           </Text>
-          {plan && read.suggestLighter ? <Options plan={plan} first={first} /> : null}
+          {plan && brief.suggestLighter ? <Options plan={plan} first={first} /> : null}
         </View>
       ) : null}
     </View>

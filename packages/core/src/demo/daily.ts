@@ -3,6 +3,7 @@
  * The last two nights are short, so the first read on open says "keep an eye on it" (one strain factor).
  */
 import type { DailyCheck, DailyRead, LighterRule } from '../signals';
+import type { SharedBrief } from '../brief';
 
 /*
  * MOCK transport between the demo apps (readShared/writeShared in @spotter/ui). Real builds use the
@@ -16,6 +17,8 @@ export interface SharedReadEntry {
   /** False when the client kept that day's read private; read is then null. */
   shared: boolean;
   read: DailyRead | null;
+  /** The daily brief as shared (brief.ts sharedBrief), when the client app computed one. */
+  brief?: SharedBrief | null;
 }
 
 export interface SharedReadsDoc {

@@ -23,3 +23,7 @@ export * from './signals';
 export * from './memory';
 export * from './retention';
 export * from './physiology';
+export * from './wearables';
+export * from './injury';
+export * from './progress';
+export * from './brief';

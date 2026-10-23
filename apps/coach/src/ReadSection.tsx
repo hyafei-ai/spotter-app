@@ -12,7 +12,11 @@ const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).pa
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const day = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
 
-/** K-3 client detail → the client's shared daily read (read-only) and the coach's easier-version rule. */
+/**
+ * K-3 client detail → the client's shared daily read (read-only) and the coach's easier-version rule.
+ * When the client app sent its daily brief, the coach sees the brief (how today feels, why, what to do)
+ * as shared: cycle, fuelling and pain reasons only when the client shares them.
+ */
 export function ReadSection({ clientId }: { clientId: string }) {
   const client = useCoach((s) => s.clients.find((c) => c.id === clientId));
   const { loaded, entries, variants } = useSharedReads(clientId);
@@ -38,7 +42,36 @@ export function ReadSection({ clientId }: { clientId: string }) {
       <SectionLabel>Today’s read</SectionLabel>
       <View style={styles.body}>
         {todays ? (
-          todays.read ? (
+          todays.read && todays.brief ? (
+            <View style={{ gap: space[1] }} accessibilityLabel={`${TONE_LABEL[todays.brief.tone]}. ${todays.brief.feel}`}>
+              <Tag label={TONE_LABEL[todays.brief.tone]} tone={TONE_TAG[todays.brief.tone]} />
+              <Text variant="bodyStrong">{todays.brief.feel.replace(/^You’re/, `${first}’s`).replace(/^You're/, `${first}'s`)}</Text>
+              {todays.brief.why.length ? (
+                <Text variant="label" color="ink2">
+                  Why
+                </Text>
+              ) : null}
+              {todays.brief.why.map((r, i) => (
+                <Text key={`${r.source}-${i}`} variant="callout">
+                  {'· '}
+                  {r.text}
+                </Text>
+              ))}
+              {todays.brief.todo.length ? (
+                <Text variant="label" color="ink2">
+                  {`What ${first} was told to do`}
+                </Text>
+              ) : null}
+              {todays.brief.todo.map((t, i) => (
+                <Text key={i} variant="callout">
+                  {`${i + 1}. ${t}`}
+                </Text>
+              ))}
+              <Text variant="caption" color="ink2">
+                Shared by {first} at {time(todays.submittedAt)}. Worded as {first} saw it.
+              </Text>
+            </View>
+          ) : todays.read ? (
             <View style={{ gap: space[1] }} accessibilityLabel={`${TONE_LABEL[todays.read.tone]}. ${todays.read.headline}`}>
               <Tag label={TONE_LABEL[todays.read.tone]} tone={TONE_TAG[todays.read.tone]} />
               <Text variant="callout">{todays.read.headline}</Text>

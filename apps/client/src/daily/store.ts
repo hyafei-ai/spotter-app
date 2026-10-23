@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { DEFAULT_LIGHTER, LighterRule, sharedRead, uuidv7, type DailyCheck, type DailyRead } from '@spotter/core';
+import { DEFAULT_LIGHTER, LighterRule, sharedRead, uuidv7, type DailyCheck, type DailyRead, type SharedBrief } from '@spotter/core';
 import {
   DEMO_CLIENT,
   EMPTY_SHARED_READS,
@@ -44,7 +44,8 @@ interface DailyState {
   /** Date the client chose "Skip today" on, so the prompt doesn't nag. */
   skippedOn: string | null;
   settings: DailySettings;
-  submit(input: CheckInput, read: (check: DailyCheck) => DailyRead): Promise<DailyCheck>;
+  /** `brief`, when given, adds the shared daily brief (brief.ts sharedBrief) to what the coach sees. */
+  submit(input: CheckInput, read: (check: DailyCheck) => DailyRead, brief?: (check: DailyCheck, read: DailyRead) => SharedBrief): Promise<DailyCheck>;
   skipToday(): void;
   setSettings(patch: Partial<DailySettings>): Promise<void>;
   recordVariant(sessionId: string, date: string, title: string, variant: SessionVariant): Promise<void>;
@@ -56,12 +57,12 @@ const DEFAULT_SETTINGS: DailySettings = { reminderOn: false, reminderHour: 7, cy
 const myCoachSideId = () => coachClientIdFor(DEMO_CLIENT.id);
 
 /** MOCK: publish the coach-visible projection for the demo coach app. Private reads publish nothing but the fact. */
-async function publishRead(check: DailyCheck, read: DailyRead) {
+async function publishRead(check: DailyCheck, read: DailyRead, brief: SharedBrief | null) {
   const doc = await readShared<SharedReadsDoc>(readsKey(tenant.slug), EMPTY_SHARED_READS);
   const id = myCoachSideId();
   const shared = sharedRead(read, check);
   const entries = (doc.reads[id] ?? []).filter((e) => e.date !== check.date);
-  entries.push({ date: check.date, submittedAt: check.submittedAt, shared: !!shared, read: shared });
+  entries.push({ date: check.date, submittedAt: check.submittedAt, shared: !!shared, read: shared, brief: shared ? brief : null });
   await writeShared(readsKey(tenant.slug), { ...doc, reads: { ...doc.reads, [id]: entries.slice(-14) } });
 }
 
@@ -89,13 +90,14 @@ export const useDaily = create<DailyState>()(
       skippedOn: null,
       settings: DEFAULT_SETTINGS,
 
-      async submit(input, toRead) {
+      async submit(input, toRead, toBrief) {
         const date = localDate();
         const check: DailyCheck = { ...input, id: uuidv7(), date, submittedAt: new Date().toISOString() };
         // Phone first, so the read shows immediately even with no signal.
         set({ checks: [...get().checks.filter((c) => c.date !== date), check] });
         const read = toRead(check);
         const shared = sharedRead(read, check);
+        const brief = shared && toBrief ? toBrief(check, read) : null;
         await syncQueue.enqueue('daily_check.submit', {
           checkId: check.id,
           date,
@@ -108,11 +110,13 @@ export const useDaily = create<DailyState>()(
           shareCycle: check.shareCycle,
           note: check.note,
           shareWithCoach: check.shareWithCoach,
-          sharedRead: shared ? { tone: shared.tone, headline: shared.headline, factors: shared.factors, suggestLighter: shared.suggestLighter } : null,
+          sharedRead: shared
+            ? { tone: shared.tone, headline: shared.headline, factors: shared.factors, suggestLighter: shared.suggestLighter, ...(brief ? { brief } : {}) }
+            : null,
           submittedAt: check.submittedAt,
         });
         void syncQueue.flush();
-        if (IS_DEMO) await publishRead(check, read);
+        if (IS_DEMO) await publishRead(check, read, brief);
         return check;
       },
 

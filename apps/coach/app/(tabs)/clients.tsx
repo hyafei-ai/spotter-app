@@ -29,6 +29,7 @@ import { requestedClientIds, triageForViewer, useDemoCheckInRequests } from '../
 import { useCheckInDone } from '../../src/retention/CheckInDone';
 import { loadCoachData, saveTriage } from '../../src/platform/serverData';
 import { PrepCard } from '../../src/memory/PrepCard';
+import { usePainTriage } from '../../src/pain/PainSection';
 import { useMemoryTriage } from '../../src/memory/useClientMemory';
 
 type Filter = 'needs' | 'all' | 'new' | 'paused' | 'payment';
@@ -52,6 +53,7 @@ export default function Clients() {
   const auth = useAuth();
   // Due follow-ups and body-variance reasons (short sleep, load spike) join the list.
   useMemoryTriage();
+  usePainTriage();
 
   // Assistants see only their assigned clients (K-8). Connected builds get this from RLS as well.
   // Check-in requests from the owner are addressed to one coach, who sees that member too (retention).

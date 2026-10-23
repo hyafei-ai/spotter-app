@@ -12,6 +12,9 @@ import { readFor, useReadInputs } from '../src/daily/read';
 import { TONE_LABEL, TONE_TAG } from '../src/daily/TodayRead';
 import { useHealthStatus } from '../src/health/HealthRow';
 import { health } from '../src/health/source';
+import { useSharedBriefFor, useTodayBriefContext } from '../src/brief/useBrief';
+import { BriefBody } from '../src/brief/BriefBody';
+import { PainCheck } from '../src/injury/PainCheck';
 
 const SCALE = ['1', '2', '3', '4', '5'].map((v) => ({ value: v, label: v }));
 
@@ -25,6 +28,8 @@ export default function CheckToday() {
   const skipToday = useDaily((s) => s.skipToday);
   const healthStatus = useHealthStatus((s) => s.status);
   const inputs = useReadInputs();
+  const briefCtx = useTodayBriefContext();
+  const briefFor = useSharedBriefFor();
   const today = localDate();
   const existing = checks.find((c) => c.date === today);
   const first = tenant.coach.name.split(' ')[0] ?? '';
@@ -77,6 +82,7 @@ export default function CheckToday() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [today, inputs, sleep, energy, soreness, stress, cyclePhase, note],
   );
+  const previewBrief = useMemo(() => briefCtx.build(preview), [briefCtx, preview]);
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/today'));
 
@@ -97,7 +103,7 @@ export default function CheckToday() {
     setSaving(true);
     setError(false);
     try {
-      await submit(input, (check) => readFor(today, check, inputs));
+      await submit(input, (check) => readFor(today, check, inputs), briefFor);
       back();
     } catch {
       setError(true);
@@ -199,6 +205,8 @@ export default function CheckToday() {
           </View>
         ) : null}
 
+        <PainCheck />
+
         <View style={{ gap: space[2] }}>
           <Toggle label={`Share today’s read with ${first}`} value={share} onChange={setShare} />
           <Text variant="caption" color="ink2">
@@ -211,14 +219,8 @@ export default function CheckToday() {
 
       <SectionLabel>Your read</SectionLabel>
       <View style={[styles.body, { paddingTop: 0, gap: space[1] }]} accessibilityLiveRegion="polite">
-        <Tag label={TONE_LABEL[preview.tone]} tone={TONE_TAG[preview.tone]} />
-        <Text variant="callout">{preview.headline}</Text>
-        {preview.factors.map((f) => (
-          <Text key={f.kind} variant="caption" color="ink2">
-            {'· '}
-            {f.text}
-          </Text>
-        ))}
+        <Tag label={TONE_LABEL[previewBrief.tone]} tone={TONE_TAG[previewBrief.tone]} />
+        <BriefBody brief={previewBrief} />
         <Text variant="caption" color="ink2">
           A read, not a diagnosis. You choose what to do with it.
         </Text>
