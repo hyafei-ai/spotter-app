@@ -6,6 +6,10 @@ no gym owner. Assistant coaches are an optional team feature; a solo coach is th
 
 The coach is the buyer. Every feature must make the coach better at knowing and keeping each client.
 
+**The sentence a trainer repeats:** "It shows me what actually works for each of my clients." First value in the
+first minute, no setup: see `docs/ux/first-value.md`. Any trainer style must work (strength, hybrid/Hyrox,
+CrossFit, endurance, general fitness), not only weights.
+
 ## UX gate for every big change (non-negotiable)
 The product owner's last product failed on confusing UX. For any big change (a new screen, a new flow, a new
 feature area, or a change to navigation), run the `anthropic-skills:app-ux-improvement` method and record it in
