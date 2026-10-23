@@ -32,7 +32,7 @@ export function useWins(): Win[] {
       ? demoMastersInput(DEMO_CLIENT.id)
       : { sessions: calibrationSessions(completed).map((s) => ({ ...s })), wearables };
     const week = input ? weeklyWins(input, today) : [];
-    const out: Win[] = week.map((w) => ({ id: `${w.kind}-${w.exerciseId ?? ''}-${w.date}`, kind: w.kind, text: w.text, date: w.date, health: HEALTH_WIN_KINDS.has(w.kind) }));
+    const out: Win[] = week.map((w) => ({ id: `${w.kind}-${w.exerciseId ?? ''}-${w.date}`, kind: w.kind, text: w.text, date: w.date, health: HEALTH_WIN_KINDS.includes(w.kind) }));
     const seen = new Set(week.map((w) => w.exerciseId).filter(Boolean));
     for (const b of bests.slice(0, 6)) {
       if (seen.has(b.exerciseId)) continue;

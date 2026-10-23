@@ -1,3 +1,4 @@
+import { HEALTH_WIN_KINDS } from './coachToday';
 import type { CycleEstimate, WearableDay } from './physiology';
 import type { CyclePhase } from './signals';
 import { WEARABLE_SOURCE_LABEL, hrvStatus, restingHrStatus, type BaselineStatus } from './wearables';
@@ -175,7 +176,7 @@ export function weekMinutes(logs: { date: string; minutes: number }[], today: st
 /* ---------- share a win ---------- */
 
 /** Wins that come from health data (watch readings). They only go on a share card when the person picks them. */
-export const HEALTH_WIN_KINDS: ReadonlySet<MastersWinKind> = new Set<MastersWinKind>(['resting_hr', 'hrv_baseline', 'sleep_regularity']);
+
 
 /** A win in the first person, for a card the client posts: "Held your Back Squat…" → "Held my Back Squat…". */
 export function firstPerson(text: string): string {
@@ -201,5 +202,5 @@ export interface ShareCard {
 export function shareCardFor(win: { kind: string; text: string }, coachName: string, appName: string): ShareCard {
   const headline = firstPerson(win.text);
   const coachedBy = `Coached by ${coachName}`;
-  return { headline, coachedBy, text: `${headline}. ${coachedBy} · ${appName}`, includesHealthData: HEALTH_WIN_KINDS.has(win.kind as MastersWinKind) };
+  return { headline, coachedBy, text: `${headline}. ${coachedBy} · ${appName}`, includesHealthData: HEALTH_WIN_KINDS.includes(win.kind as MastersWinKind) };
 }
