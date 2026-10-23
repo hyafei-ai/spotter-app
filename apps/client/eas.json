@@ -25,6 +25,10 @@
       "ios": { "resourceClass": "m-medium" },
       "android": { "buildType": "app-bundle" }
     },
+    "production-watch": {
+      "extends": "production",
+      "env": { "SPOTTER_WATCH": "1" }
+    },
     "shared": {
       "extends": "production",
       "env": { "TENANT_ID": "spotter" }

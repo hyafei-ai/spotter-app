@@ -68,6 +68,9 @@ const config: ExpoConfig = {
     ['expo-camera', { cameraPermission: 'Scan food barcodes and record sets for your coach.', recordAudioAndroid: true }],
     ['@kingstinct/react-native-healthkit', { NSHealthShareUsageDescription: 'Read your steps, bodyweight and sleep so your coach can see them next to your training.', NSHealthUpdateUsageDescription: false, background: false }],
     'expo-health-connect',
+    // The trainer's Apple Watch app (docs/features/watch.md). Opt-in: web exports, Android and today's EAS
+    // builds are unchanged unless SPOTTER_WATCH=1 (scripts/tenant-build.mjs sets it for iOS builds).
+    ...(process.env.SPOTTER_WATCH === '1' ? ['./plugins/withSpotterWatch.js'] : []),
   ],
   experiments: { typedRoutes: false, ...(baseUrl ? { baseUrl } : {}) },
   updates: {

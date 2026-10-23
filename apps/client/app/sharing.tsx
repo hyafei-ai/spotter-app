@@ -12,6 +12,7 @@ import { useFuel } from '../src/fuel/store';
 import { useInjury } from '../src/injury/store';
 import { useHealthImports } from '../src/health/store';
 import { useMobility } from '../src/mobility/store';
+import { useWatch } from '../src/watch/store';
 
 interface Row {
   key: string;
@@ -45,6 +46,8 @@ export default function Sharing() {
   const setImported = useHealthImports((s) => s.setShareImported);
   const mobilityShare = useMobility((s) => s.shareWithCoach);
   const setMobility = useMobility((s) => s.setShare);
+  const watchHr = useWatch((s) => s.shareHr);
+  const setWatchHr = useWatch((s) => s.setShareHr);
   const [error, setError] = useState(false);
   const back = () => (router.canGoBack() ? router.back() : router.replace('/body'));
 
@@ -100,6 +103,13 @@ export default function Sharing() {
       sees: 'Minutes and type, like your sessions (“10 min · Hip and ankle mobility”)',
       on: mobilityShare,
       set: (on) => setMobility(on),
+    },
+    {
+      key: 'watch-hr',
+      title: 'Heart rate from watch sessions',
+      sees: 'Average and peak heart rate of a session, and how fast it came down after (for example “down 31 bpm in the first minute”), never the raw readings',
+      on: watchHr,
+      set: (on) => setWatchHr(on),
     },
   ];
 
@@ -177,14 +187,14 @@ export default function Sharing() {
 
       <SectionLabel>{`${first} never sees`}</SectionLabel>
       <View style={[styles.body, { gap: space[2] }]}>
-        {['Your period dates or symptoms', 'Your food logs, calories or body fat', 'Raw heart data from your watch (only the daily read’s plain words, when you share it)', 'Anything you switch to “Only you” above'].map((t) => (
+        {['Your period dates or symptoms', 'Your food logs, calories or body fat', 'Raw heart data from your watch (only plain words and session summaries, when you share them)', 'Anything you switch to “Only you” above'].map((t) => (
           <View key={t} style={styles.never}>
             <Feather name="lock" size={16} color={colors.ink2} />
             <Text style={{ flex: 1 }}>{t}</Text>
           </View>
         ))}
         <Text variant="caption" color="ink2" style={{ marginTop: space[2] }}>
-          {`Turning cycle, fuel, pain, watch workouts or mobility off also hides what was shared before. Daily reads you already shared stay with ${first}; the switch applies from your next check-in. Changes save on this phone and sync when you’re online.`}
+          {`Turning cycle, fuel, pain, watch workouts, mobility or watch heart rate off also hides what was shared before. Daily reads you already shared stay with ${first}; the switch applies from your next check-in. Changes save on this phone and sync when you’re online.`}
         </Text>
       </View>
     </Screen>

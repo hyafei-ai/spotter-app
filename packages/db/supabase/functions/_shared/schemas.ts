@@ -397,6 +397,39 @@ export const Mutation = z.discriminatedUnion('kind', [
   z.object({ ...base, kind: z.literal('mobility.delete'), payload: z.object({ mobilityId: uuid, deletedAt: isoDateTime }) }),
   // Who sees what: the client turns the coach's view of their mobility logs on or off (all logs, past and future).
   z.object({ ...base, kind: z.literal('mobility.share.set'), payload: z.object({ shareWithCoach: z.boolean(), updatedAt: isoDateTime }) }),
+  // Apple Watch (docs/features/watch.md): heart-rate summary of a session logged on the watch. Summary only
+  // (average, peak, recovery after 1 and 2 minutes, splits); raw samples stay in Apple Health. The coach sees
+  // it only while the client's "Heart rate from watch sessions" switch is on.
+  z.object({
+    ...base,
+    kind: z.literal('session.watch'),
+    payload: z.object({
+      sessionId: uuid,
+      source: z.literal('apple_watch'),
+      avgHr: z.number().int().min(30).max(240).nullable(),
+      maxHr: z.number().int().min(30).max(240).nullable(),
+      hrrPeak: z.number().int().min(30).max(240).nullable(),
+      hrr60: z.number().int().min(-60).max(200).nullable(),
+      hrr120: z.number().int().min(-60).max(200).nullable(),
+      splits: z
+        .array(
+          z.object({
+            kind: z.enum(['interval', 'station', 'timed']),
+            name: z.string().max(60),
+            rep: z.number().int().min(0),
+            sec: z.number().int().min(0).max(7200),
+            distanceM: z.number().min(0).nullable(),
+            avgHr: z.number().int().min(30).max(240).nullable(),
+            maxHr: z.number().int().min(30).max(240).nullable(),
+          }),
+        )
+        .max(60),
+      shareWithCoach: z.boolean(),
+      recordedAt: isoDateTime,
+    }),
+  }),
+  // The client's switch for the above, applied to every watch summary (past and future).
+  z.object({ ...base, kind: z.literal('watch.share.set'), payload: z.object({ shareWithCoach: z.boolean(), updatedAt: isoDateTime }) }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];

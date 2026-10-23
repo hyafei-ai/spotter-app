@@ -7,7 +7,7 @@
 //
 // Tenants come from Supabase (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) or, without them, the demo JSON.
 // Real builds need EXPO_TOKEN, and for store work the tenant's encrypted credentials plus CREDENTIALS_KEK.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -149,15 +149,40 @@ async function runOne(tenant, platform, opts) {
   return runOneUnlocked(tenant, platform, opts);
 }
 
+/**
+ * The trainer's Apple Watch app ships inside their iPhone app (docs/features/watch.md). For an iOS build: render
+ * the tenant's icon at every watchOS size, check no watch surface says Spotter, and turn the watch plugin on
+ * (SPOTTER_WATCH=1 → apps/client/plugins/withSpotterWatch.js). Opt out per tenant with `watch: false`.
+ */
+function watchStep(tenant, platform, kind, dryRun) {
+  if (platform !== 'ios' || kind !== 'build' || tenant.watch === false) return {};
+  const steps = [
+    ['python3', ['scripts/make-tenant-icons.py', '--watch', tenant.slug]],
+    ['node', ['scripts/check-watch-whitelabel.mjs']],
+  ];
+  for (const [bin, args] of steps) {
+    if (dryRun) {
+      console.log(`[dry-run] ${tenant.slug} ios watch: ${bin} ${args.join(' ')}`);
+      continue;
+    }
+    const r = spawnSync(bin, args, { cwd: ROOT, stdio: 'inherit' });
+    if (r.status !== 0) throw new Error(`${tenant.slug}: watch step failed (${bin} ${args.join(' ')})`);
+  }
+  return { SPOTTER_WATCH: '1' };
+}
+
 async function runOneUnlocked(tenant, platform, opts) {
   const dir = mkdtempSync(join(tmpdir(), `spotter-${tenant.slug}-`));
   try {
     const configPath = join(dir, 'tenant.json');
     writeFileSync(configPath, JSON.stringify(tenant));
     const env = { TENANT_ID: tenant.slug, TENANT_CONFIG_PATH: configPath, ...(tenant.easProjectId ? { EAS_PROJECT_ID: tenant.easProjectId } : {}) };
-    const cmd = commandFor(opts.kind, platform, tenant, opts.message);
+    Object.assign(env, watchStep(tenant, platform, opts.kind, opts.dryRun));
+    // The watch plugin must also run on the EAS worker, so iOS builds with the watch use the profile that sets
+    // SPOTTER_WATCH=1 there (eas.json "production-watch"), not only this shell's env.
+    const cmd = commandFor(opts.kind, platform, tenant, opts.message).map((a) => (env.SPOTTER_WATCH && a === 'production' ? 'production-watch' : a));
     if (opts.dryRun) {
-      console.log(`[dry-run] ${tenant.slug} ${platform}: TENANT_ID=${tenant.slug} ${cmd.join(' ')}`);
+      console.log(`[dry-run] ${tenant.slug} ${platform}: TENANT_ID=${tenant.slug}${env.SPOTTER_WATCH ? ' SPOTTER_WATCH=1' : ''} ${cmd.join(' ')}`);
       return { ok: true, out: '' };
     }
     if (opts.kind !== 'update') Object.assign(env, await credentialEnv(tenant, platform, dir));

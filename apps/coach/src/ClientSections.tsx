@@ -8,6 +8,7 @@ import { RememberSection } from './memory/RememberSection';
 import { CycleSection } from './CycleSection';
 import { FuelSection } from './fuel/FuelSection';
 import { PainSection } from './pain/PainSection';
+import { WatchSection } from './watch/WatchSection';
 import { viewerSeesHealth } from '@spotter/core';
 import { useViewerLens } from './atrisk/AtRiskList';
 
@@ -38,6 +39,7 @@ const SECTIONS: React.ComponentType<{ clientId: string }>[] = [
   CoachSection,
   healthOnly(ReadSection),
   healthOnly(PainSection),
+  healthOnly(WatchSection),
   RememberSection,
   healthOnly(CycleSection),
   healthOnly(FuelSection),

@@ -14,3 +14,4 @@ export * from './fuel';
 export * from './cycle';
 export * from './patterns';
 export * from './coachToday';
+export * from './watch';

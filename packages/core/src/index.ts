@@ -38,6 +38,7 @@ export * from './masters';
 export * from './sources';
 export * from './bodyview';
 export * from './coachToday';
+export * from './watch';
 export * from './parse';
 export * from './templates';
 export * from './hyrox';
