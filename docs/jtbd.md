@@ -50,3 +50,17 @@ Avoid: "analytics for your gym", "business intelligence", "member engagement pla
 Signals and rules: `packages/core/src/signals.ts` (rule-based and explainable; no scores shown to clients, no
 medical claims). "Kept" means still active 60 days after the coach stepped in. It's a correlation shown to the
 owner as such, not proof that the check-in caused it.
+
+## Physiology layer: needs attention and MRR at risk (Oct 2026)
+
+Same three jobs, same tests ([`docs/physiology.md`](physiology.md), [`docs/features/at-risk.md`](features/at-risk.md)).
+
+| Feature | Job | Test it passes |
+|---|---|---|
+| Clients → **Needs attention**: who could use a check-in, with reasons from what each athlete shared ("Running tired 5 of the last 7 days", "Fuel check flagged") | Coach | Remembers what they'd otherwise miss; never says "churn" or "at risk" |
+| Client detail → **Between sessions**: shared reads, fuel check, pain, progress, cycle, plus what to ask | Coach | Preps a conversation in under 30 s |
+| **Retention**: live MRR at risk per currency, 12-week trend, MRR kept after a check-in | Owner | Predicts cancellations with money at stake; shows members kept, with a dollar amount |
+
+The owner never sees health data. Sleep, cycle, fuelling and pain stay between the athlete and their coach, and only
+when the athlete shares them. On the owner's side, any of it shows as one line: "Their coach has flagged something
+worth a check-in".

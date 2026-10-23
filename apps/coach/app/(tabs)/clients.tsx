@@ -30,12 +30,14 @@ import { useCheckInDone } from '../../src/retention/CheckInDone';
 import { loadCoachData, saveTriage } from '../../src/platform/serverData';
 import { PrepCard } from '../../src/memory/PrepCard';
 import { useMemoryTriage } from '../../src/memory/useClientMemory';
-import { useFuelTriage } from '../../src/fuel/store';
+import { AtRiskList } from '../../src/atrisk/AtRiskList';
 
-type Filter = 'needs' | 'all' | 'new' | 'paused' | 'payment';
+type Filter = 'needs' | 'all' | 'attention' | 'new' | 'paused' | 'payment';
 const FILTERS: { value: Filter; label: string }[] = [
   { value: 'needs', label: 'Needs you' },
   { value: 'all', label: 'All' },
+  // Who could use a check-in, with reasons from what each athlete shared (src/atrisk).
+  { value: 'attention', label: 'Needs attention' },
   { value: 'new', label: 'New' },
   { value: 'paused', label: 'Paused' },
   { value: 'payment', label: 'Payment issue' },
@@ -53,8 +55,6 @@ export default function Clients() {
   const auth = useAuth();
   // Due follow-ups and body-variance reasons (short sleep, load spike) join the list.
   useMemoryTriage();
-  // A shared "worth talking to someone" fuel check joins the list too.
-  useFuelTriage();
 
   // Assistants see only their assigned clients (K-8). Connected builds get this from RLS as well.
   // Check-in requests from the owner are addressed to one coach, who sees that member too (retention).
@@ -168,7 +168,7 @@ export default function Clients() {
           })}
         </ScrollView>
       </View>
-      {list.length > 1 ? (
+      {filter !== 'attention' && list.length > 1 ? (
         <Pressable
           accessibilityRole="button"
           onPress={() =>
@@ -185,7 +185,9 @@ export default function Clients() {
           </Text>
         </Pressable>
       ) : null}
-      {clients.length === 0 ? (
+      {filter === 'attention' && clients.length > 0 ? (
+        <AtRiskList visibleIds={clients.map((c) => c.id)} query={query} />
+      ) : clients.length === 0 ? (
         <EmptyState message="No clients yet. Send your first invite and they’ll show up here." actionLabel="Invite a client" onAction={() => router.push('/invite')} />
       ) : list.length === 0 ? (
         <EmptyState
