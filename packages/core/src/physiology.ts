@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { isoDate } from './schemas';
-import { CYCLE_PHASES, type CyclePhase, type ReadTone } from './signals';
+import { type CyclePhase, type ReadTone } from './signals';
 
 /**
  * Shared contracts for the physiology layer (docs/physiology.md): cycle-phase calibration, fuelling

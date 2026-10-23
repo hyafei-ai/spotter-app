@@ -48,4 +48,4 @@ in preparation) can replace it by implementing the same interface, with no UI ch
 | Cycle + calibration | `cycle.ts`, `calibration.ts` | `docs/features/cycle.md` |
 | Fuelling + energy availability | `fuel.ts` | `docs/features/fuel.md` |
 | Daily brief, wearables, injury, progress | `brief.ts`, `injury.ts`, `progress.ts` | `docs/features/brief.md` |
-| Coach roster + owner MRR at risk | `retention.ts`, `signals.ts` | `docs/features/at-risk.md` |
+| Coach roster + owner MRR at risk | `atrisk.ts` (on `retention.ts`, `signals.ts`) | `docs/features/at-risk.md` |
