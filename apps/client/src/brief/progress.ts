@@ -7,26 +7,16 @@ import {
   progressWins,
   versionFor,
   weekIndexFor,
-  type CalibrationSession,
   type Consistency,
   type E1rmTrend,
   type ProgressWin,
 } from '@spotter/core';
 import { localDate } from '../nutrition/store';
-import { useApp, type CompletedSession } from '../store';
+import { useApp } from '../store';
 import { useAssigned } from '../programs';
 import { usePhaseOn } from './inputs';
-
-/** Finished sessions as calibration sessions: only weighted sets with reps count toward bests. */
-export function calibrationSessions(completed: CompletedSession[]): CalibrationSession[] {
-  return completed.map((s) => ({
-    date: s.date,
-    feel: s.feel || null,
-    sets: s.sets
-      .filter((x) => x.weightKg != null && x.reps != null)
-      .map((x) => ({ exerciseId: x.exerciseId, weightKg: x.weightKg!, reps: x.reps!, rpe: x.rpe })),
-  }));
-}
+// Same sessions the calibration reads: the client's own, plus (demo only) the MOCK six months.
+import { calibrationSessions } from '../cycle/store';
 
 export interface ProgressView {
   wins: ProgressWin[];
@@ -55,7 +45,7 @@ export function useProgress(): ProgressView {
       wins: progressWins({ sessions, phaseOn, names }),
       trends: mainLifts(sessions, today).map((id) => e1rmTrend(sessions, id, today, names)),
       consistency: consistency(
-        completed.map((s) => s.date),
+        sessions.map((s) => s.date),
         today,
         8,
         planned,
