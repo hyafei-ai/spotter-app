@@ -8,6 +8,7 @@ import { RememberSection } from './memory/RememberSection';
 import { CycleSection } from './CycleSection';
 import { FuelSection } from './fuel/FuelSection';
 import { BetweenSessionsSection } from './atrisk/BetweenSessionsSection';
+import { PainSection } from './pain/PainSection';
 
 /**
  * Feature sections on the coach's client detail (K-3): program, check-ins, form checks, nutrition,
@@ -22,6 +23,7 @@ const SECTIONS: React.ComponentType<{ clientId: string }>[] = [
   NutritionSection,
   CoachSection,
   ReadSection,
+  PainSection,
   RememberSection,
   CycleSection,
   FuelSection,

@@ -208,6 +208,11 @@ export interface DailyBrief {
   why: BriefReason[];
   /** "Here's what to do": concrete, at most 3. */
   todo: string[];
+  /**
+   * Added by the brief build (optional): which reason source each to-do came from (null = general),
+   * parallel to `todo`, so sharedBrief can drop the to-dos of reasons the athlete keeps private.
+   */
+  todoSources?: (BriefReason['source'] | null)[];
   /** The calibrated load change applied to today's session (0 = none), with the reason. */
   calibration: { appliedPct: number; reason: string } | null;
   suggestLighter: boolean;
@@ -224,4 +229,62 @@ export interface PhysiologySignals {
   progressStalled: boolean;
   /** Easier-day reads on 4+ of the last 7 days. */
   runningTired: boolean;
+}
+
+/* ---------- health-app imports (added by the brief build; additions only) ---------- */
+
+/**
+ * One day of food totals that another app (MyMacros, MyFitnessPal, Cronometer…) wrote to Apple Health
+ * or Health Connect, so the athlete never types them twice. Null = that app didn't write the nutrient.
+ */
+export interface HealthNutritionDay {
+  date: string;
+  kcal: number | null;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  /** Names of the apps that wrote the samples ("MyMacros"), for "From MyMacros via Apple Health". */
+  sources: string[];
+}
+
+/** Kinds of workouts imported from the health app, in plain groups. */
+export const IMPORTED_ACTIVITIES = ['run', 'walk', 'hike', 'ride', 'swim', 'row', 'strength', 'hiit', 'yoga', 'pilates', 'dance', 'class', 'other'] as const;
+export type ImportedActivity = (typeof IMPORTED_ACTIVITIES)[number];
+export const IMPORTED_ACTIVITY_LABEL: Record<ImportedActivity, string> = {
+  run: 'Run',
+  walk: 'Walk',
+  hike: 'Hike',
+  ride: 'Ride',
+  swim: 'Swim',
+  row: 'Row',
+  strength: 'Strength workout',
+  hiit: 'Intervals',
+  yoga: 'Yoga',
+  pilates: 'Pilates',
+  dance: 'Dance',
+  class: 'Class',
+  other: 'Workout',
+};
+
+/** A workout recorded outside Spotter (Apple Watch Workout app, Strava, Garmin…) read from the health app. */
+export interface ImportedWorkout {
+  /** The health store's own id (HKWorkout uuid / Health Connect metadata id), so re-imports upsert. */
+  id: string;
+  date: string;
+  startedAt: string;
+  durationMin: number;
+  activity: ImportedActivity;
+  activeKcal: number | null;
+  distanceM: number | null;
+  avgHr: number | null;
+  maxHr: number | null;
+  source: 'apple_health' | 'health_connect';
+  /** The app that recorded it ("Workout", "Strava"), when the health store says. */
+  sourceApp: string | null;
+}
+
+/** A period read from the health app's menstrual-flow records: consecutive flow days grouped together. */
+export interface HealthPeriod {
+  start: string;
+  end: string | null;
 }

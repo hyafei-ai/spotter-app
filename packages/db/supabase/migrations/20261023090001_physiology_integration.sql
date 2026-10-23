@@ -26,3 +26,13 @@ begin
 end $$;
 create trigger health_forget_on_account_delete after update of status on public.memberships
   for each row execute function public.health_forget_on_account_delete();
+
+-- 3. One triage reason list for every build: the fuel and brief migrations each redefined it with only
+--    their own addition.
+alter table public.triage_items drop constraint if exists triage_items_reason_code_check;
+alter table public.triage_items add constraint triage_items_reason_code_check check (reason_code in (
+  'payment_failed', 'parq_flag', 'form_check_waiting', 'check_in_submitted', 'unread_message', 'missed_sessions', 'churn_risk', 'new_client',
+  'follow_up_due', 'sleep_short_streak', 'load_spike',
+  'check_in_request',
+  'fuel_pattern', 'pain_ongoing'
+));

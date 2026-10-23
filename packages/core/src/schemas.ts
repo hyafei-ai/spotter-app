@@ -239,6 +239,16 @@ export const Mutation = z.discriminatedUnion('kind', [
           headline: z.string().max(300),
           factors: z.array(z.object({ kind: z.string().max(40), text: z.string().max(400), strain: z.boolean() })).max(20),
           suggestLighter: z.boolean(),
+          /** The daily brief as shared (brief.ts sharedBrief): cycle, fuel and pain reasons only when shared. */
+          brief: z
+            .object({
+              tone: z.enum(['steady', 'watch', 'ease']),
+              feel: z.string().max(200),
+              why: z.array(z.object({ source: z.string().max(20), text: z.string().max(300) })).max(3),
+              todo: z.array(z.string().max(300)).max(3),
+              suggestLighter: z.boolean(),
+            })
+            .optional(),
         })
         .nullable(),
       submittedAt: isoDateTime,
@@ -308,6 +318,66 @@ export const Mutation = z.discriminatedUnion('kind', [
       sharedAt: isoDateTime,
     }),
   }),
+  // Daily brief (docs/features/brief.md): pain logs, wearable days and workouts imported from the health app.
+  z.object({
+    ...base,
+    kind: z.literal('pain.log'),
+    payload: z.object({
+      painId: uuid,
+      date: isoDate,
+      region: z.enum(['neck', 'shoulder', 'elbow', 'wrist', 'upper_back', 'lower_back', 'hip', 'knee', 'ankle', 'foot', 'other']),
+      side: z.enum(['left', 'right', 'both']).nullable(),
+      level: z.number().int().min(0).max(10),
+      note: z.string().max(300).nullable(),
+      shareWithCoach: z.boolean(),
+      loggedAt: isoDateTime,
+    }),
+  }),
+  z.object({ ...base, kind: z.literal('pain.delete'), payload: z.object({ painId: uuid, deletedAt: isoDateTime }) }),
+  z.object({
+    ...base,
+    kind: z.literal('wearable.days'),
+    payload: z.object({
+      days: z
+        .array(
+          z.object({
+            date: isoDate,
+            source: z.enum(['apple_health', 'health_connect', 'manual']),
+            sleepHours: z.number().min(0).max(16).nullable(),
+            hrvMs: z.number().min(0).max(500).nullable(),
+            restingHr: z.number().min(20).max(250).nullable(),
+            activeKcal: z.number().min(0).max(20000).nullable(),
+          }),
+        )
+        .min(1)
+        .max(60),
+    }),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal('workout.import'),
+    payload: z.object({
+      workouts: z
+        .array(
+          z.object({
+            externalId: z.string().min(1).max(200),
+            date: isoDate,
+            startedAt: isoDateTime,
+            durationMin: z.number().min(0).max(1440),
+            activity: z.enum(['run', 'walk', 'hike', 'ride', 'swim', 'row', 'strength', 'hiit', 'yoga', 'pilates', 'dance', 'class', 'other']),
+            activeKcal: z.number().min(0).max(20000).nullable(),
+            distanceM: z.number().min(0).max(1_000_000).nullable(),
+            avgHr: z.number().min(20).max(250).nullable(),
+            maxHr: z.number().min(20).max(250).nullable(),
+            source: z.enum(['apple_health', 'health_connect']),
+            sourceApp: z.string().max(120).nullable(),
+            shareWithCoach: z.boolean(),
+          }),
+        )
+        .min(1)
+        .max(100),
+    }),
+  }),
 ]);
 export type Mutation = z.infer<typeof Mutation>;
 export type MutationKind = Mutation['kind'];
@@ -342,6 +412,8 @@ export const TriageReason = z.enum([
   'check_in_request',
   // Fuel check shared at "worth talking to someone" (docs/features/fuel.md).
   'fuel_pattern',
+  // Daily brief: pain logged 3+ days of 14 (or 6/10+), shared with the coach (docs/features/brief.md).
+  'pain_ongoing',
 ]);
 export type TriageReason = z.infer<typeof TriageReason>;
 

@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { IconButton, Screen, SectionLabel, SegmentedControl, Skeleton, Text, useTheme, margin, space, touchMin } from '@spotter/ui';
 import { tenant } from '../../src/env';
 import { useDaily } from '../../src/daily/store';
+import { useHealthImports } from '../../src/health/store';
 import { hourLabel } from '../../src/daily/DailyCheckRow';
 
 const HOURS = [6, 7, 8, 9].map((h) => ({ value: String(h), label: hourLabel(h) }));
@@ -49,7 +50,15 @@ export default function DailyCheckSettings() {
           <SectionLabel>Sharing</SectionLabel>
           <View style={styles.body}>
             <Toggle label={`Share my read with ${first} by default`} value={settings.shareDefault} onChange={(shareDefault) => void setSettings({ shareDefault })} />
-            <Toggle label="Track your cycle (optional, private)" value={settings.cycleTracking} onChange={(cycleTracking) => void setSettings({ cycleTracking })} />
+            <Toggle
+              label="Track your cycle (optional, private)"
+              value={settings.cycleTracking}
+              onChange={(cycleTracking) => {
+                void setSettings({ cycleTracking });
+                // Cycle data from the health app is only asked for now, never at the first connect.
+                if (cycleTracking) void useHealthImports.getState().requestCycleAccess();
+              }}
+            />
           </View>
 
           <SectionLabel>{`What ${first} sees`}</SectionLabel>

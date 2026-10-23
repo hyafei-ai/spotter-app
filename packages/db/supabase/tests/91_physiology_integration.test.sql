@@ -28,3 +28,11 @@ select pg_temp.check(
   and not exists (select 1 from fuel_settings where client_id = 'a0000000-0000-7000-8000-0000000000c1'),
   'deleting an account removes daily checks and fuel settings');
 rollback;
+
+-- Both physiology triage reasons are accepted.
+begin;
+insert into triage_items (tenant_id, client_id, reason_code, priority) values
+  ('a0000000-0000-7000-8000-000000000000', 'a0000000-0000-7000-8000-0000000000c1', 'fuel_pattern', 62),
+  ('a0000000-0000-7000-8000-000000000000', 'a0000000-0000-7000-8000-0000000000c1', 'pain_ongoing', 68);
+select pg_temp.check(true, 'fuel and pain triage reasons are both allowed');
+rollback;
