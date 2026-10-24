@@ -21,6 +21,7 @@ import {
   type ProgramDay,
 } from '@spotter/core';
 import { Button, EmptyState, IconButton, ListRow, Screen, SectionLabel, Sheet, Tag, Text, TextField, useTheme, useToast, margin, space } from '@spotter/ui';
+import { Checkbox } from '@spotter/ui/platform';
 import { DEMO_CLIENTS } from '@spotter/core/demo';
 import { useEditing, useLibrary, usePrograms } from '../../../../src/programs';
 import { ExercisePicker, WeekdayPicker } from '../../../../src/programUi';
@@ -327,6 +328,9 @@ function BriefCard({ brief, onChange }: { brief: DayBriefState; onChange: (b: Da
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState({ stimulus: brief.stimulus, strategy: brief.strategy });
   const draft = brief.status === 'draft';
+  // An AI draft reaches clients only after the coach says they've read it (approving shouldn't be a reflex tap).
+  const [read, setRead] = useState(false);
+  const needsRead = draft && brief.source === 'ai';
   return (
     <View>
       <SectionLabel right={<Tag label={draft ? 'Draft · clients don’t see it' : 'Approved · clients see it'} tone={draft ? 'warning' : 'success'} />}>Strategy & stimulus</SectionLabel>
@@ -350,6 +354,11 @@ function BriefCard({ brief, onChange }: { brief: DayBriefState; onChange: (b: Da
               <Text variant="caption" color="ink2" style={{ marginTop: space[2] }}>
                 Drafted by AI from this session’s parts only. Check it before you approve.
               </Text>
+            ) : null}
+            {needsRead ? (
+              <View style={{ marginTop: space[2] }}>
+                <Checkbox checked={read} onChange={setRead} label="I’ve read it and it fits this client" />
+              </View>
             ) : null}
           </>
         )}
@@ -381,6 +390,8 @@ function BriefCard({ brief, onChange }: { brief: DayBriefState; onChange: (b: Da
                 <Button
                   label="Approve"
                   kind="secondary"
+                  disabled={needsRead && !read}
+                  disabledReason="Tick “I’ve read it” first"
                   onPress={() => {
                     onChange({ ...brief, status: 'approved', updatedAt: new Date().toISOString() });
                     toast({ message: 'Approved. Clients see it from their next session.' });

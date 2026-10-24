@@ -400,3 +400,8 @@ side by side. Clear; the risk is approving without reading (see 12).
 | Trust (no invented numbers, MOCK labelled) | 5 | Self-comparison only; MOCK on demo names; AI drafts marked |
 
 All Critical and High issues are fixed.
+
+## Follow-up (Oct 24): approving an AI draft takes a deliberate step
+Top remaining issue 1 is fixed: for an AI-drafted Strategy & Stimulus, Approve is disabled until the coach ticks "I've
+read it and it fits this client" (the reason is shown under the button). Coach-written or coach-edited text approves
+in one tap as before. Checked at 390×844 (k11, k11b, k12 in the flow11 screenshots).
