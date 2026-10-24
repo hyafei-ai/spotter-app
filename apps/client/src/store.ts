@@ -1,16 +1,23 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
+  NEW_RUNNER,
   evaluateProgression,
+  planBlocks,
+  runnerReduce,
+  runnerSpec,
   setKey,
   uuidv7,
+  type BlockResult,
+  type RunnerEvent,
+  type RunnerState,
   type ExerciseSessionResult,
   type LoggedSet,
   type ProgramExercise,
   type ProgressionSuggestion,
   type SessionPlan,
 } from '@spotter/core';
-import { DEMO_HISTORY, LOWER_A, isoDay, type PastSession } from '@spotter/core/demo';
+import { DEMO_HISTORY, LOWER_A, demoSessionPlan, isoDay, type DemoSessionKind, type PastSession } from '@spotter/core/demo';
 import { lookupDay, planFor } from './programs';
 import { kv, clearLocalData } from './storage';
 import { syncQueue } from './sync';
@@ -30,10 +37,14 @@ export interface ActiveSession {
   keptLoad: Record<string, boolean>;
   /** Which version the client chose from Today's read. Absent means as planned. */
   variant?: 'planned' | 'lighter' | 'recovery';
+  /** Scores and splits of the session's non-strength blocks (AMRAPs, intervals, race sims…). */
+  results?: BlockResult[];
+  /** The block timer that's running, persisted so it survives the app being killed (core blockRunner). */
+  runner?: { blockId: string; state: RunnerState } | null;
 }
 
 /** `plan` is what was prescribed that day, kept so History can show targets after the program changes. */
-export type CompletedSession = PastSession & { note: string | null; plan?: SessionPlan; variant?: 'planned' | 'lighter' | 'recovery' };
+export type CompletedSession = PastSession & { note: string | null; plan?: SessionPlan; variant?: 'planned' | 'lighter' | 'recovery'; results?: BlockResult[] };
 
 export interface ChatMessage {
   id: string;
@@ -59,7 +70,7 @@ interface AppState {
   active: ActiveSession | null;
   completed: CompletedSession[];
   messages: ChatMessage[];
-  demo: { todayMode: TodayMode; billingProblem: boolean; offline: boolean };
+  demo: { todayMode: TodayMode; billingProblem: boolean; offline: boolean; session?: 'program' | DemoSessionKind };
 
   submitIntake(form: { id: string; version: number }, answers: Record<string, unknown>, parqFlag: boolean): Promise<void>;
   signWaiver(signedName: string, signatureSvg: string): Promise<void>;
@@ -71,6 +82,12 @@ interface AppState {
   swapExercise(programExerciseId: string, alt: { exerciseId: string; name: string } | null): void;
   keepLoad(programExerciseId: string): void;
   finishSession(feel: number | null, note: string | null): Promise<CompletedSession | null>;
+  /** Block timer: start (or resume) a block's runner, and feed it taps (lap, undo, pause, finish). */
+  runnerEvent(blockId: string, e: RunnerEvent): void;
+  clearRunner(): void;
+  /** Save a block's score (replaces an earlier one for the same block); returns the stored result. */
+  saveBlockResult(result: Omit<BlockResult, 'sessionId' | 'loggedAt'>): Promise<BlockResult | null>;
+  undoBlockResult(blockId: string): Promise<void>;
   sendMessage(body: string): Promise<void>;
   setDemo(patch: Partial<AppState['demo']>): void;
   resetDemo(): Promise<void>;
@@ -182,6 +199,39 @@ export const useApp = create<AppState>()(
         if (active) set({ active: { ...active, keptLoad: { ...active.keptLoad, [programExerciseId]: true } } });
       },
 
+      runnerEvent(blockId, e) {
+        const active = get().active;
+        if (!active) return;
+        const block = planBlocks(active.plan).find((b) => b.id === blockId);
+        const spec = block ? runnerSpec(block) : null;
+        if (!spec) return;
+        const cur = active.runner?.blockId === blockId ? active.runner.state : NEW_RUNNER;
+        set({ active: { ...active, runner: { blockId, state: runnerReduce(spec, cur, e) } } });
+      },
+
+      clearRunner() {
+        const active = get().active;
+        if (active) set({ active: { ...active, runner: null } });
+      },
+
+      async saveBlockResult(r) {
+        const active = get().active;
+        if (!active) return null;
+        const result: BlockResult = { ...r, sessionId: active.sessionId, loggedAt: new Date().toISOString() };
+        set({ active: { ...active, runner: active.runner?.blockId === r.blockId ? null : active.runner, results: [...(active.results ?? []).filter((x) => x.blockId !== r.blockId), result] } });
+        await syncQueue.enqueue('block.result', result);
+        void syncQueue.flush();
+        return result;
+      },
+
+      async undoBlockResult(blockId) {
+        const active = get().active;
+        if (!active) return;
+        set({ active: { ...active, results: (active.results ?? []).filter((x) => x.blockId !== blockId) } });
+        await syncQueue.enqueue('block.void', { sessionId: active.sessionId, blockId, voidedAt: new Date().toISOString() });
+        void syncQueue.flush();
+      },
+
       async finishSession(feel, note) {
         const active = get().active;
         if (!active) return null;
@@ -199,6 +249,7 @@ export const useApp = create<AppState>()(
           sets: [...active.sets].sort((a, b) => a.loggedAt.localeCompare(b.loggedAt)),
           plan: active.plan,
           ...(active.variant ? { variant: active.variant } : {}),
+          ...(active.results?.length ? { results: [...active.results] } : {}),
         };
         set({ active: null, completed: [...get().completed, done] });
         return done;
@@ -239,6 +290,9 @@ export function todayPlan(mode: TodayMode): SessionPlan | null {
   if (!IS_DEMO) return usePulled.getState().nextPlan;
   if (mode !== 'session') return null;
   const today = isoDay(0);
+  // MOCK (demo): Me → Demo → Today's session swaps in a sample WOD, interval or race-sim session.
+  const kind = useApp.getState().demo.session;
+  if (kind && kind !== 'program') return demoSessionPlan(kind, today);
   if (lookupDay(today).kind === 'no_program') return { ...LOWER_A, scheduledDate: today };
   return planFor(today, useApp.getState().completed.flatMap((s) => s.sets));
 }

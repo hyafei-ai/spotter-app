@@ -160,7 +160,7 @@ export default function WatchPreview() {
             ]
           : null}
         {interval ? frame('Interval', <IntervalScreen block={interval} i={Math.min(1, interval.reps - 1)} working seconds={interval.workSec ? 22 : interval.distanceM && interval.distanceM >= 400 ? 251 : 38} bpm={152} />, { caption: 'Work counts down; distance work ends with Done.' }) : null}
-        {station ? frame('Station', <StationScreen block={station} units={plan!.units} seconds={74} bpm={161} canUndo />, { caption: 'Hyrox-style: one big Done, then Undo for 5 seconds.' }) : null}
+        {station ? frame('Station', <StationScreen block={station} units={plan!.units} seconds={74} bpm={161} canUndo />, { caption: 'Race format: one big Done, then Undo for 5 seconds.' }) : null}
         {timed ? frame('Timed', <TimedScreen block={timed} working seconds={18} bpm={128} />) : null}
         {frame('Pause or end', <MenuScreen logged={Math.max(1, total - 4)} total={total} />, { caption: 'From “…”. Ending always saves what was logged.' })}
         {frame('End and save', <MenuScreen logged={Math.max(1, total - 4)} total={total} confirm />)}

@@ -156,7 +156,7 @@ describe('business stats', () => {
 
   it('works on the demo data', () => {
     const s = businessStats(demoSubscriptions(NOW.getTime()), NOW);
-    expect(s.activeClients).toBe(7);
+    expect(s.activeClients).toBe(10); // 8 original demo clients minus the paused one, plus the 3 multisport ones (demo/multisport.ts)
     expect(s.mrrCents).toBeGreaterThan(0);
   });
 });

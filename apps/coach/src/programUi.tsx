@@ -50,10 +50,16 @@ export function NumberField({
 }
 
 /** Horizontal filter chips (one selected or none). */
-export function Chips<T extends string>({ label, options, value, onChange }: { label: string; options: { value: T; label: string }[]; value: T | null; onChange: (v: T | null) => void }) {
+export function Chips<T extends string>({ label, options, value, onChange, inset = false }: { label: string; options: { value: T; label: string }[]; value: T | null; onChange: (v: T | null) => void; inset?: boolean }) {
   const { colors } = useTheme();
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityLabel={label}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.chipsScroll}
+      contentContainerStyle={[styles.chips, inset && { paddingHorizontal: 0 }]}
+      accessibilityLabel={label}
+    >
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -156,7 +162,8 @@ export function ExercisePicker({
 }
 
 const styles = StyleSheet.create({
-  chips: { paddingHorizontal: margin, gap: space[2], paddingVertical: space[2] },
+  chipsScroll: { flexGrow: 0 },
+  chips: { paddingHorizontal: margin, gap: space[2], paddingVertical: space[2], alignItems: 'center' },
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: space[4], minHeight: 40, justifyContent: 'center' },
   week: { flexDirection: 'row', gap: space[1] },
   weekday: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },

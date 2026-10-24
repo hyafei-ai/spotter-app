@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { WatchSessionPlan, WatchSessionSummary } from '@spotter/core';
+import type { WatchBlockOrigin, WatchSessionPlan, WatchSessionSummary } from '@spotter/core';
 import { DEMO_CLIENT, EMPTY_SHARED_WATCH, coachClientIdFor, watchKey, type SharedWatchDoc } from '@spotter/core/demo';
 import { readShared, writeShared } from '@spotter/ui';
 import { kv } from '../storage';
@@ -17,7 +17,9 @@ interface WatchState {
   setShareHr(on: boolean): Promise<void>;
   /** planId → plan, for the last few days of contexts. */
   plans: Record<string, WatchSessionPlan>;
-  rememberPlans(plans: WatchSessionPlan[]): void;
+  /** planId → where each watch block came from in the session's blocks (WODs, intervals, race sims). */
+  origins: Record<string, (WatchBlockOrigin | null)[]>;
+  rememberPlans(plans: WatchSessionPlan[], origins?: Record<string, (WatchBlockOrigin | null)[]>): void;
   /** Result ids already stored: the same result delivered twice is stored once. */
   seen: string[];
   markSeen(id: string): void;
@@ -43,14 +45,16 @@ export const useWatch = create<WatchState>()(
         }
       },
       plans: {},
-      rememberPlans(plans) {
+      origins: {},
+      rememberPlans(plans, origins = {}) {
         const next = { ...get().plans };
         for (const p of plans) next[p.planId] = p;
         // Keep the last 30 plans (about ten days of three versions).
         const keep = Object.values(next)
           .sort((a, b) => a.date.localeCompare(b.date))
           .slice(-30);
-        set({ plans: Object.fromEntries(keep.map((p) => [p.planId, p])) });
+        const allOrigins = { ...get().origins, ...origins };
+        set({ plans: Object.fromEntries(keep.map((p) => [p.planId, p])), origins: Object.fromEntries(keep.map((p) => [p.planId, allOrigins[p.planId] ?? []])) });
       },
       seen: [],
       markSeen: (id) => set({ seen: [...get().seen, id].slice(-200) }),

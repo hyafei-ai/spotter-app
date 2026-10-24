@@ -9,6 +9,7 @@ import {
   dayFor,
   formatDuration,
   mondayOf,
+  resultLine,
   trendText,
   volumeKg,
   weekMinutes,
@@ -18,6 +19,8 @@ import { isoDay } from '@spotter/core/demo';
 import { EmptyState, ListRow, MiniBars, Screen, ScreenHeader, SectionLabel, Skeleton, Tag, Text, useTheme, fonts, margin, radius, space } from '@spotter/ui';
 import { shortDate, w } from '../../src/format';
 import { todayPlan, useApp, type CompletedSession } from '../../src/store';
+import { tenant } from '../../src/env';
+
 import { useAssigned } from '../../src/programs';
 import { useHealthImports, visibleWorkouts } from '../../src/health/store';
 import { importedSessions } from '../../src/health/loads';
@@ -28,6 +31,14 @@ import { mobilityFromImported } from '@spotter/core';
 import { localDate } from '../../src/nutrition/store';
 import { calibrationSessions } from '../../src/cycle/store';
 
+/** A history row's line: scores first ("Fran 4:12"), then sets, time and volume when there are sets. */
+function sessionLine(s: CompletedSession): string {
+  const time = formatDuration((Date.parse(s.finishedAt) - Date.parse(s.startedAt)) / 1000);
+  const scores = (s.results ?? []).map((r) => resultLine(r, tenant.units));
+  const sets = s.sets.length ? [`${s.sets.length} sets`] : [];
+  const vol = volumeKg(s.sets) > 0 ? [w(volumeKg(s.sets))] : [];
+  return [...scores, ...sets, time, ...vol].join(' · ');
+}
 type Row = { kind: 'session'; at: string; s: CompletedSession } | { kind: 'workout'; at: string; w: ImportedWorkout };
 
 /** "Run · 5.2 km · from Apple Watch". */
@@ -83,7 +94,7 @@ export default function Train() {
             <ListRow
               key={item.s.sessionId}
               title={`${item.s.title} · ${shortDate(item.s.date)}`}
-              subtitle={`${item.s.sets.length} sets · ${formatDuration((Date.parse(item.s.finishedAt) - Date.parse(item.s.startedAt)) / 1000)} · ${w(volumeKg(item.s.sets))}`}
+              subtitle={sessionLine(item.s)}
               right={item.s.variant === 'lighter' ? <Tag label="Easier version" /> : item.s.variant === 'recovery' ? <Tag label="Recovery" /> : undefined}
               chevron
               last={index === arr.length - 1}

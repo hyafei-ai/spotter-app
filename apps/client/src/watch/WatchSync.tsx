@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { boundWatchContext } from '@spotter/core';
 import { watchNative } from './native';
-import { useWatchContext } from './context';
+import { sentOrigins, useWatchContext } from './context';
 import { handleInbound } from './inbound';
 import { useWatch } from './store';
 
@@ -25,7 +25,7 @@ function Live() {
     const bounded = boundWatchContext(ctx);
     if (!bounded) return;
     last.current = key;
-    useWatch.getState().rememberPlans(bounded.plans);
+    useWatch.getState().rememberPlans(bounded.plans, Object.fromEntries(bounded.plans.map((p) => [p.planId, sentOrigins.get(p.planId) ?? []])));
     void watchNative.updateContext(JSON.stringify(bounded)).then(() => useWatch.getState().setLastContextAt(bounded.sentAt));
   }, [ctx]);
 

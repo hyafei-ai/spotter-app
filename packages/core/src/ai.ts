@@ -4,7 +4,7 @@ import {
   type ExerciseSessionResult,
   type ProgressionSuggestion,
 } from './progression';
-import type { ExerciseMetric, LoggedSet, ProgramExercise, ProgressionRule } from './schemas';
+import { DayBrief, type Block, type BlockMovement, type ExerciseMetric, type LoggedSet, type ProgramExercise, type ProgressionRule } from './schemas';
 
 /**
  * AI assistant (K-2). Everything here is pure and shared by the coach app (demo mode) and the
@@ -566,6 +566,149 @@ export function mockProgramDraft(input: ProgramDraftInput): ProgramDraftOutput {
   });
   const goal = input.goal ? `${input.goal[0]!.toUpperCase()}${input.goal.slice(1)}` : 'Training';
   return ProgramDraftOutput.parse({ name: `${goal} block · ${input.weeks} weeks`, weeks });
+}
+
+/* ---------- Strategy & Stimulus (docs/ports.md row 8) ---------- */
+
+/**
+ * The session as the model sees it: blocks only. No client, no name, age, sex or health data: a Strategy &
+ * Stimulus brief is about the workout, written once per program day for every client on it. Free text (titles,
+ * notes, movement names) goes through `redact`. The coach approves or edits every draft before a client sees it.
+ */
+export interface DayBriefSource {
+  title: string;
+  coachNote: string | null;
+  blocks: Block[];
+  /** Strength exercises by program-exercise id: name and a one-line prescription ("5 × 5 @ 80% 1RM"). */
+  exercises: Record<string, { name: string; prescription: string }>;
+  units: 'kg' | 'lb';
+}
+
+export const DayBriefInput = z.object({
+  title: z.string().max(80),
+  coachNote: z.string().nullable(),
+  units: z.enum(['kg', 'lb']),
+  blocks: z
+    .array(
+      z.object({
+        kind: z.string(),
+        title: z.string().nullable(),
+        timing: z.string().nullable(),
+        scoredBy: z.string(),
+        timeCapSec: z.number().nullable(),
+        lines: z.array(z.string().max(160)).max(40),
+        note: z.string().nullable(),
+      }),
+    )
+    .min(1)
+    .max(40),
+});
+export type DayBriefInput = z.infer<typeof DayBriefInput>;
+
+const kg = (x: number | null, units: 'kg' | 'lb') => (x == null ? null : units === 'kg' ? `${Math.round(x * 2) / 2} kg` : `${Math.round(x * 2.2046226218)} lb`);
+function movementForPrompt(m: BlockMovement, units: 'kg' | 'lb'): string {
+  const parts = [
+    m.reps != null ? `${m.reps}${m.repsAlt != null ? `/${m.repsAlt}` : ''} reps` : null,
+    m.calories != null ? `${m.calories} cal` : null,
+    m.distanceM != null ? `${m.distanceM} m` : null,
+    m.durationSec != null ? `${m.durationSec} s` : null,
+    kg(m.loadKg, units),
+    m.pct1rm != null ? `${Math.round(m.pct1rm * 100)}% of max` : null,
+  ].filter(Boolean);
+  return redact(`${m.name}${parts.length ? `: ${parts.join(', ')}` : ''}${m.note ? ` (${m.note})` : ''}`, 160) ?? m.name;
+}
+
+function timingOf(b: Block): string | null {
+  switch (b.kind) {
+    case 'amrap':
+      return `${b.durationSec} s`;
+    case 'emom':
+      return `every ${b.intervalSec} s for ${b.rounds} rounds${b.rotate ? ', movements rotate' : ''}`;
+    case 'interval_amrap':
+    case 'tabata':
+      return `${b.rounds} rounds of ${b.workSec} s work, ${b.restSec} s rest`;
+    case 'rounds_for_time':
+      return `${b.rounds} rounds${b.restSec ? `, ${b.restSec} s rest between` : ''}`;
+    case 'rep_scheme':
+      return `reps ${b.scheme.join('-')}`;
+    case 'intervals':
+      return `${b.reps} × ${b.distanceM != null ? `${b.distanceM} m` : `${b.workSec} s`} ${b.modality}, ${b.restSec} s rest${b.target ? `, target ${b.target.kind === 'pace' ? `${b.target.secPerKm} s/km` : b.target.kind === 'watts' ? `${b.target.watts} W` : b.target.kind === 'hr_zone' ? `heart-rate zone ${b.target.zone}` : `RPE ${b.target.rpe}`}` : ''}`;
+    case 'timed':
+    case 'rest':
+      return `${b.durationSec} s`;
+    default:
+      return null;
+  }
+}
+
+/** Minimum fields: the blocks, their timing and movements, the coach's own note. Nothing about any client. */
+export function buildDayBriefInput(src: DayBriefSource): DayBriefInput {
+  const blocks = src.blocks
+    .filter((b) => b.kind !== 'note' || b.text.trim())
+    .map((b) => ({
+      kind: b.kind,
+      title: redact(b.title, 60),
+      timing: timingOf(b),
+      scoredBy: b.scoring,
+      timeCapSec: b.timeCapSec,
+      lines:
+        b.kind === 'strength'
+          ? b.exerciseIds.map((id) => src.exercises[id]).filter((e): e is { name: string; prescription: string } => !!e).map((e) => redact(`${e.name}: ${e.prescription}`, 160)!)
+          : b.kind === 'station_race'
+            ? b.segments.map((m) => movementForPrompt(m, src.units))
+            : b.kind === 'note'
+              ? [redact(b.text, 160)!]
+              : 'movements' in b
+                ? b.movements.map((m) => movementForPrompt(m, src.units))
+                : [],
+      note: redact(b.note, 300),
+    }));
+  return DayBriefInput.parse({ title: redact(src.title, 80) ?? 'Session', coachNote: redact(src.coachNote, 400), units: src.units, blocks });
+}
+
+/** What the model returns: the same shape the client sees once approved. */
+export const DayBriefOutput = DayBrief;
+export type DayBriefOutput = DayBrief;
+
+export const DAY_BRIEF_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['stimulus', 'strategy'],
+  properties: { stimulus: { type: 'string' }, strategy: { type: 'string' } },
+} as const;
+
+export const DAY_BRIEF_SYSTEM = `You help a personal trainer write the "Strategy & Stimulus" note for one training session. The trainer edits and approves it before any client sees it.
+Write two short parts in plain, direct language to the athlete ("you"):
+- stimulus: what the session should feel like and what it trains (one or two sentences, at most 300 characters).
+- strategy: how to pace and approach it: where to break sets, how hard to start, what to hold back for (two or three sentences, at most 500 characters).
+Use only the session in the data. Don't invent target times, scores, heart rates or percentages that aren't in it. No medical advice, no hype, no emoji. Don't mention any brand or race series.`;
+
+export function dayBriefPrompt(input: DayBriefInput): { system: string; user: string } {
+  return { system: DAY_BRIEF_SYSTEM, user: `Here is the session as JSON. Return {"stimulus": "...", "strategy": "..."}.\n\n${JSON.stringify(input)}` };
+}
+
+/**
+ * MOCK: a deterministic stand-in for the model in demo builds, built only from the blocks' own kinds and timing,
+ * so it never states a number the session doesn't have.
+ */
+export function mockDayBrief(input: DayBriefInput): DayBriefOutput {
+  const main = input.blocks.find((b) => b.kind !== 'strength' && b.kind !== 'rest' && b.kind !== 'note') ?? input.blocks[0]!;
+  const name = main.title ?? input.title;
+  const byKind: Record<string, [string, string]> = {
+    amrap: [`Steady, sustained work: ${name} should feel hard but repeatable from the first round to the last.`, 'Start at a pace you could hold for the whole clock. Break sets early and keep moving; short planned rests beat long unplanned ones.'],
+    for_time: [`A push from start to finish: ${name} is about moving well while breathing hard.`, 'Go out at about 80% so you can keep the same pace in the second half. Break the bigger sets before you have to.'],
+    rounds_for_time: [`Repeatable rounds: ${name} should feel challenging but even across every round.`, 'Aim for the same time each round. Note your first round and hold it; if you slow, shorten the rests, not the reps.'],
+    rep_scheme: [`Short and intense: ${name} should feel fast and uncomfortable, mostly in the first set.`, 'Go hard on the first set but plan a break before you fail a rep. The descending sets reward staying close to unbroken.'],
+    emom: ['Quality under a clock: every minute should leave you some rest before the next.', 'Pick a pace that finishes each minute with 15–20 seconds to spare. If the rest disappears, scale the reps, not the form.'],
+    tabata: ['Short, sharp efforts: each work interval is near-maximal, each rest a quick reset.', 'Keep the same rep count each round as far as you can; the score is about the whole set, not the first round.'],
+    interval_amrap: ['Hard windows with rest: each window should feel strong, and the rest should let you start the next one well.', 'Use the first window to find a pace you can repeat; treat the rests as part of the work.'],
+    intervals: ['Controlled hard running: each rep should feel strong and the last should be as good as the first.', 'Run the first rep a little easier than you think. Hold the same pace every rep; use the rest fully.'],
+    station_race: ['A race rehearsal: steady, controlled running with the stations as the hard parts.', 'Run the first run easier than race pace. Move straight from each station into a calm first 200 m, then settle into pace.'],
+    timed: ['Steady work at a pace you can talk at, building the base.', 'Keep it easy enough to finish feeling you could do more.'],
+    strength: ['Heavy, crisp strength work: every rep fast and controlled.', 'Warm up gradually to the working sets. Take the full rest; stop a set if a rep slows a lot.'],
+  };
+  const [stimulus, strategy] = byKind[main.kind] ?? byKind.strength!;
+  return DayBriefOutput.parse({ stimulus, strategy });
 }
 
 /* ---------- usage cap ---------- */

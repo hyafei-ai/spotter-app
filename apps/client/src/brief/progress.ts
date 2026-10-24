@@ -5,12 +5,15 @@ import {
   e1rmTrend,
   mainLifts,
   progressWins,
+  scoreHistories,
   versionFor,
   weekIndexFor,
   type Consistency,
   type E1rmTrend,
   type ProgressWin,
+  type ScoreHistory,
 } from '@spotter/core';
+import { tenant } from '../env';
 import { localDate } from '../nutrition/store';
 import { useApp } from '../store';
 import { useAssigned } from '../programs';
@@ -24,6 +27,10 @@ export interface ProgressView {
   consistency: Consistency;
   /** Phase-calibrated bests are possible (cycle data exists). */
   phaseAware: boolean;
+  /** Benchmarks, intervals and race sims, most recent first (blocks with a score). */
+  histories: ScoreHistory[];
+  /** More scored sessions than lifting ones: lead with scores. */
+  scoresFirst: boolean;
 }
 
 /** Wins beyond raw PRs, e1RM trends for the main lifts and consistency, from what's logged on the phone. */
@@ -41,8 +48,12 @@ export function useProgress(): ProgressView {
       const weeks = versionFor(assignment, today).program.weeks;
       planned = weeks[Math.min(weekIndexFor(assignment.startDate, today), weeks.length - 1)]?.days.length ?? null;
     }
+    const scored = completed.filter((c) => c.results?.length).map((c) => ({ date: c.date, results: c.results! }));
+    const lifting = completed.filter((c) => c.sets.some((x) => x.weightKg != null)).length;
     return {
-      wins: progressWins({ sessions, phaseOn, names }),
+      wins: progressWins({ sessions, phaseOn, names, scored }),
+      histories: scoreHistories(scored, tenant.units),
+      scoresFirst: scored.length > lifting,
       trends: mainLifts(sessions, today).map((id) => e1rmTrend(sessions, id, today, names)),
       consistency: consistency(
         sessions.map((s) => s.date),

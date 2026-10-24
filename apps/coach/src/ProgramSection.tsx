@@ -1,10 +1,11 @@
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { dayFor, describeExercise } from '@spotter/core';
+import { dayBlocks, dayFor, describeBlock } from '@spotter/core';
+import { tenant } from './env';
 import { isoDay } from '@spotter/core/demo';
 import { Button, ListRow, SectionLabel, Tag, Text, margin, space } from '@spotter/ui';
 import { activeAssignmentFor, usePrograms } from './programs';
-import { longDate } from './format';
+import { describeInUnit, longDate } from './format';
 
 /** Client detail (K-3): current program, today's session, and the assign/adjust/edit-today actions. */
 export function ProgramSection({ clientId }: { clientId: string }) {
@@ -28,7 +29,9 @@ export function ProgramSection({ clientId }: { clientId: string }) {
   const d = dayFor(a, today);
   const totalWeeks = program.weeks.length;
   const status =
-    d.kind === 'session' || d.kind === 'rest'
+    totalWeeks === 0
+      ? 'Single sessions, sent one date at a time'
+      : d.kind === 'session' || d.kind === 'rest'
       ? `Week ${d.weekIndex + 1} of ${totalWeeks}`
       : d.kind === 'not_started'
         ? `Starts ${longDate(a.startDate)}`
@@ -58,7 +61,15 @@ export function ProgramSection({ clientId }: { clientId: string }) {
         title={d.kind === 'session' ? `Today: ${d.day.title}` : d.kind === 'rest' ? 'Today: rest day' : 'Today: nothing scheduled'}
         subtitle={
           d.kind === 'session'
-            ? `${d.overridden ? 'Edited for today · ' : ''}${d.day.exercises.map((e) => `${e.name} ${describeExercise(e)}`).join(' · ')}`
+            ? `${d.overridden ? 'Edited for today · ' : ''}${dayBlocks(d.day)
+                .flatMap((b) =>
+                  b.kind === 'strength'
+                    ? b.exerciseIds.map((x) => d.day.exercises.find((e) => e.id === x)).filter((e) => !!e).map((e) => `${e!.name} ${describeInUnit(e!)}`)
+                    : b.kind === 'note'
+                      ? []
+                      : [describeBlock(b, tenant.units)],
+                )
+                .join(' · ')}`
             : undefined
         }
         last

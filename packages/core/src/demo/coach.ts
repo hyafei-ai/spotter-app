@@ -28,6 +28,10 @@ export const DEMO_CLIENTS: DemoClient[] = [
   { id: id(6), name: 'Mei Tanaka', plan: 'Pay in full · 12 weeks', startDate: '2026-09-01', status: 'active', flags: [], thisWeek: { planned: 4, done: 2 }, lastSession: 'Pull · 2 days ago' },
   { id: id(7), name: 'Daniel O’Sullivan', plan: 'Online coaching · monthly', startDate: '2026-01-12', status: 'paused', flags: [], thisWeek: { planned: 0, done: 0 }, lastSession: 'Upper A · 5 weeks ago' },
   { id: id(8), name: 'Fatima Zahra El Idrissi', plan: 'Online coaching · weekly', startDate: '2026-07-30', status: 'active', flags: [], thisWeek: { planned: 3, done: 2 }, lastSession: 'Lower A · 2 days ago' },
+  // Multisport demo clients (demo/multisport.ts): race-format, functional fitness and a masters runner.
+  { id: id(9), name: 'Sasha Okafor', plan: 'Hybrid · race prep', startDate: '2026-05-04', status: 'active', flags: [], thisWeek: { planned: 4, done: 3 }, lastSession: 'Threshold kilometres · 2 days ago' },
+  { id: id(10), name: 'Ravi Kapoor', plan: 'Online coaching · monthly', startDate: '2026-02-16', status: 'active', flags: [], thisWeek: { planned: 5, done: 4 }, lastSession: 'Fran · yesterday' },
+  { id: id(11), name: 'Ruth Adeyemi', plan: 'Run coaching · monthly', startDate: '2025-11-03', status: 'active', flags: [], thisWeek: { planned: 3, done: 2 }, lastSession: 'Easy run · 3 days ago' },
 ];
 
 export function demoTriage(): TriageItem[] {

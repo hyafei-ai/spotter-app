@@ -1,7 +1,7 @@
-import { Alert, Linking, Platform, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import { Banner, ListRow, Screen, ScreenHeader, SectionLabel, SegmentedControl, Text, useTheme, margin, space } from '@spotter/ui';
-import { DEMO_CLIENT } from '@spotter/core/demo';
+import { DEMO_CLIENT, DEMO_SESSION_KINDS, DEMO_SESSION_LABEL } from '@spotter/core/demo';
 import { COACH_URL, IS_DEMO, tenant } from '../../src/env';
 import { setDemoOffline } from '../../src/sync';
 import { useApp, type TodayMode } from '../../src/store';
@@ -10,6 +10,7 @@ import { AccountRows, ME_CONNECTION_ROWS, ME_PLAN_ROWS, MeRows } from '../../src
 /** C-10 Me. Demo builds add demo controls and "Switch to coach view". */
 export default function Me() {
   const { demo, setDemo, waiver, resetDemo } = useApp();
+  const { colors } = useTheme();
 
   const confirm = (title: string, message: string, onYes: () => void) => {
     if (Platform.OS === 'web') {
@@ -70,6 +71,27 @@ export default function Me() {
                 { value: 'none', label: 'No program' },
               ]}
             />
+            <Text variant="label" color="ink2">
+              Today’s session (sample)
+            </Text>
+            <View style={styles.sessionChips} accessibilityRole="radiogroup" accessibilityLabel="Today’s session (sample)">
+              {(['program', ...DEMO_SESSION_KINDS] as const).map((k) => {
+                const on = (demo.session ?? 'program') === k;
+                return (
+                  <Pressable
+                    key={k}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                    onPress={() => setDemo({ session: k, todayMode: 'session' })}
+                    style={[styles.sessionChip, { borderColor: on ? colors.ink : colors.line, backgroundColor: on ? colors.ink : 'transparent' }]}
+                  >
+                    <Text variant="callout" style={{ color: on ? colors.paper : colors.ink }}>
+                      {k === 'program' ? 'From the program' : DEMO_SESSION_LABEL[k]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
             <ToggleRow
               label="Simulate no signal"
               value={demo.offline}
@@ -108,5 +130,7 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
 
 const styles = StyleSheet.create({
   demo: { paddingHorizontal: margin, paddingVertical: space[3], gap: space[3] },
+  sessionChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  sessionChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: space[3], minHeight: 40, justifyContent: 'center' },
   toggle: { flexDirection: 'row', alignItems: 'center', minHeight: 48 },
 });

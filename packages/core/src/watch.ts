@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { checkBrandColor, deriveDarkBrand, onColor } from './brand';
-import { isoDate, isoDateTime, uuid, type LoggedSet, type ProgramExercise, type SessionPlan } from './schemas';
+import { isoDate, isoDateTime, uuid, type Block, type BlockKind, type BlockResult, type BlockSplit, type LoggedSet, type ProgramExercise, type ScoringMode, type SessionPlan } from './schemas';
 import { performanceOrder } from './session';
+import { EMPTY_SCORE, blockKey, blockLabel, isStrengthOnly, planBlocks } from './blocks';
 import type { DailyBrief } from './physiology';
 import type { TenantConfig } from './tenant';
 
@@ -19,9 +20,10 @@ import type { TenantConfig } from './tenant';
  * rather than guess. Payloads are bounded well under the WatchConnectivity size limits (Apple doesn't publish
  * an exact number for application context; ~64 KB is the commonly observed message cap, so we stay under 48 KB).
  *
- * Today's program model is strength-shaped, so `watchPlanFromSession` produces strength blocks (plus `interval`
- * or `timed` blocks for the `time` and `distance` metrics). `interval` targets and `station` blocks are ready for
- * the multi-sport program model (next phase); the demo uses a MOCK conditioning session to exercise them.
+ * `watchPlanFromSession` maps the session's blocks (blocks.ts): strength exercises to `strength` blocks (or `interval`
+ * / `timed` for the `time` and `distance` metrics), intervals to `interval`, race-sim runs to distance `interval`s
+ * and stations to `station`, EMOM / tabata / interval AMRAP to timed `interval` windows, for-time work to a
+ * `station` the client marks done, and AMRAPs and timed pieces to `timed`. The contract itself didn't change.
  */
 
 export const WATCH_PAYLOAD_VERSION = 1 as const;
@@ -390,13 +392,86 @@ export interface WatchPlanOptions {
   calibrationLine?: string | null;
 }
 
+/** Where a watch block came from in the session's blocks, so its result maps back (null: a strength exercise). */
+export interface WatchBlockOrigin {
+  blockId: string;
+  kind: BlockKind;
+  key: string;
+  label: string;
+  scoring: ScoringMode;
+}
+
+const noLink = { exerciseId: null, programExerciseId: null } as const;
+
+/** One session block → watch blocks (strength blocks are handled by the caller, exercise by exercise). */
+function watchBlocksOf(b: Block): WatchBlock[] {
+  const name = clip(blockLabel(b), 60);
+  switch (b.kind) {
+    case 'intervals':
+      return [{ kind: 'interval', ...noLink, name, reps: b.reps, workSec: b.distanceM != null ? null : Math.max(1, b.workSec ?? 60), distanceM: b.distanceM, restSec: Math.min(1800, b.restSec), target: b.target }];
+    case 'emom':
+      return [{ kind: 'interval', ...noLink, name, reps: Math.min(60, b.rounds), workSec: b.intervalSec, distanceM: null, restSec: 0, target: null }];
+    case 'tabata':
+    case 'interval_amrap':
+      return [{ kind: 'interval', ...noLink, name, reps: Math.min(60, b.rounds), workSec: b.workSec, distanceM: null, restSec: Math.min(1800, b.restSec), target: null }];
+    case 'station_race':
+      return b.segments.map((sg) =>
+        sg.kind === 'run'
+          ? { kind: 'interval' as const, ...noLink, name: clip(sg.name, 60), reps: 1, workSec: sg.distanceM != null ? null : 60, distanceM: sg.distanceM, restSec: 0, target: null }
+          : { kind: 'station' as const, ...noLink, name: clip(sg.name, 60), distanceM: sg.distanceM, reps: sg.reps, loadKg: sg.loadKg },
+      );
+    case 'for_time':
+    case 'rounds_for_time':
+    case 'rep_scheme':
+      return [{ kind: 'station', ...noLink, name, distanceM: null, reps: null, loadKg: null }];
+    case 'amrap':
+    case 'timed':
+    case 'rest':
+      return [{ kind: 'timed', ...noLink, name, seconds: Math.min(7200, b.durationSec) }];
+    default:
+      return [];
+  }
+}
+
+/** The session's blocks → watch blocks, where each came from, and the step order. */
+function watchLayout(plan: SessionPlan): { blocks: WatchBlock[]; origins: (WatchBlockOrigin | null)[]; order: [number, number][] } {
+  const blocks: WatchBlock[] = [];
+  const origins: (WatchBlockOrigin | null)[] = [];
+  const order: [number, number][] = [];
+  for (const b of planBlocks(plan)) {
+    if (b.kind === 'strength') {
+      const exercises = b.exerciseIds.map((id) => plan.exercises.find((e) => e.id === id)).filter((e): e is ProgramExercise => !!e);
+      const start = blocks.length;
+      const sub: SessionPlan = { ...plan, exercises, blocks: undefined };
+      const made = exercises.map(blockFor);
+      blocks.push(...made);
+      origins.push(...made.map(() => null));
+      order.push(...stepOrder(sub, made).map(([i, j]): [number, number] => [start + i, j]));
+      continue;
+    }
+    const origin: WatchBlockOrigin = { blockId: b.id, kind: b.kind, key: blockKey(b), label: blockLabel(b), scoring: b.scoring };
+    for (const wb of watchBlocksOf(b)) {
+      const i = blocks.length;
+      blocks.push(wb);
+      origins.push(origin);
+      order.push(...repsOf(wb).map((r): [number, number] => [i, r]));
+    }
+  }
+  return { blocks, origins, order };
+}
+
+/** Parallel to a plan's `blocks`: where each watch block came from (keep it on the phone with the plan). */
+export function watchBlockOrigins(plan: SessionPlan): (WatchBlockOrigin | null)[] {
+  return isStrengthOnly(plan) ? plan.exercises.map(() => null) : watchLayout(plan).origins;
+}
+
 /** One of today's session versions → the plan the watch runs. Loads are already resolved and, on the planned version, calibrated. */
 export function watchPlanFromSession(plan: SessionPlan, o: WatchPlanOptions): WatchSessionPlan {
   const cal = o.version === 'planned' && o.calibrate ? o.calibrate : null;
-  const blocks = plan.exercises.map(blockFor).map((b) =>
-    b.kind === 'strength' && cal ? { ...b, sets: b.sets.map((s) => ({ ...s, loadKg: s.loadKg == null ? null : cal(s.loadKg) })) } : b,
-  );
-  const changed = cal != null && blocks.some((b, i) => b.kind === 'strength' && b.sets.some((s, j) => s.loadKg !== plan.exercises[i]!.sets[j]?.loadKg));
+  const layout = isStrengthOnly(plan) ? null : watchLayout(plan);
+  const raw = layout ? layout.blocks : plan.exercises.map(blockFor);
+  const blocks = raw.map((b) => (b.kind === 'strength' && cal ? { ...b, sets: b.sets.map((s) => ({ ...s, loadKg: s.loadKg == null ? null : cal(s.loadKg) })) } : b));
+  const changed = cal != null && blocks.some((b, i) => b.kind === 'strength' && raw[i]!.kind === 'strength' && b.sets.some((s, j) => s.loadKg !== (raw[i] as typeof b).sets[j]?.loadKg));
   return {
     v: WATCH_PAYLOAD_VERSION,
     planId: `${plan.programDayId}:${plan.scheduledDate}:${o.version}`,
@@ -409,9 +484,59 @@ export function watchPlanFromSession(plan: SessionPlan, o: WatchPlanOptions): Wa
     units: o.units,
     incrementKg: o.incrementKg,
     calibration: changed && o.calibrationLine ? clip(o.calibrationLine, 160) : null,
-    blocks,
-    order: stepOrder(plan, blocks),
+    blocks: blocks.slice(0, 40),
+    order: (layout ? layout.order : stepOrder(plan, blocks)).filter(([b]) => b < 40).slice(0, 400),
   };
+}
+
+/**
+ * The block results a watch session holds for the session's non-strength blocks (strength sets map through
+ * `watchResultToSession`). Interval reps, race segments, for-time "done" and timed pieces become splits and a time;
+ * scores the watch can't count (AMRAP rounds, tabata reps) are left empty for the client to add on the phone.
+ */
+export function watchResultToBlockResults(result: WatchResult, plan: WatchSessionPlan, origins: (WatchBlockOrigin | null)[]): BlockResult[] {
+  const by = new Map<string, { origin: WatchBlockOrigin; splits: BlockSplit[]; sec: number; m: number }>();
+  const add = (b: number, split: Omit<BlockSplit, 'index'>) => {
+    const o = origins[b];
+    if (!o) return;
+    const cur = by.get(o.blockId) ?? { origin: o, splits: [], sec: 0, m: 0 };
+    cur.splits.push({ ...split, index: cur.splits.length });
+    cur.sec += split.sec;
+    cur.m += split.distanceM ?? 0;
+    by.set(o.blockId, cur);
+  };
+  const r1 = (x: number) => Math.round(x * 10) / 10;
+  for (const it of result.intervals) {
+    const b = plan.blocks[it.b];
+    if (b?.kind !== 'interval') continue;
+    const race = origins[it.b]?.kind === 'station_race';
+    add(it.b, { kind: race ? 'run' : 'interval', name: b.name, sec: r1(it.workSec), distanceM: it.distanceM ?? b.distanceM, avgHr: it.avgHr, maxHr: it.maxHr });
+  }
+  for (const st of result.stations) {
+    const b = plan.blocks[st.b];
+    if (b?.kind !== 'station') continue;
+    add(st.b, { kind: 'station', name: b.name, sec: r1(st.sec), distanceM: b.distanceM, avgHr: st.avgHr, maxHr: st.maxHr });
+  }
+  for (const t of result.timed) {
+    const b = plan.blocks[t.b];
+    if (b?.kind !== 'timed') continue;
+    add(t.b, { kind: 'interval', name: b.name, sec: r1(t.sec), distanceM: null, avgHr: null, maxHr: null });
+  }
+  return [...by.values()].map(({ origin, splits, sec, m }) => {
+    const oneDone = origin.kind === 'for_time' || origin.kind === 'rounds_for_time' || origin.kind === 'rep_scheme';
+    return {
+      sessionId: result.resultId,
+      blockId: origin.blockId,
+      kind: origin.kind,
+      key: origin.key,
+      label: clip(origin.label, 80),
+      scoring: origin.scoring,
+      score: { ...EMPTY_SCORE, timeSec: Math.round(sec), distanceM: m > 0 ? m : null },
+      splits: oneDone ? [] : splits.slice(0, 100),
+      rpe: null,
+      loggedAt: result.endedAt,
+    };
+  });
 }
 
 /**

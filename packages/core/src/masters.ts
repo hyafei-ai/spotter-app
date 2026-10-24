@@ -2,6 +2,8 @@ import { STARTER_LIBRARY } from './library';
 import { sessionBestE1rms } from './calibration';
 import { repBests } from './progress';
 import type { CalibrationSession, WearableDay } from './physiology';
+import { scoreText, scoreValue } from './blocks';
+import type { ScoredSession } from './trends';
 
 /**
  * Motivation beyond raw PRs for masters athletes (docs/features/masters.md). After 40, and more so after
@@ -58,6 +60,8 @@ export interface MastersInput {
   /** First day with this coach, for "since starting coaching". */
   coachStart?: string | null;
   names?: Record<string, string>;
+  /** Scored blocks (benchmarks, intervals, race sims), for bests that aren't lifts. */
+  scored?: ScoredSession[];
 }
 
 export type MastersWinKind =
@@ -71,7 +75,8 @@ export type MastersWinKind =
   | 'capability_best'
   | 'resting_hr'
   | 'hrv_baseline'
-  | 'sleep_regularity';
+  | 'sleep_regularity'
+  | 'score_best';
 
 export interface MastersWin {
   kind: MastersWinKind;
@@ -279,7 +284,8 @@ export function volumeBests(input: MastersInput, today: string): MastersWin[] {
 /** Density: the same lifts and about the same work (within 5% tonnage) as an earlier session, in 10%+ less time (at least 5 minutes). */
 export function densityBests(input: MastersInput, today: string): MastersWin[] {
   const t = dayNum(today);
-  const timed = input.sessions.filter((s) => s.durationMin != null && s.durationMin > 0 && dayNum(s.date) <= t).sort((a, b) => a.date.localeCompare(b.date));
+  // Lifting sessions only: a run or a WOD with no sets would match every other one ("same work").
+  const timed = input.sessions.filter((s) => s.sets.length > 0 && s.durationMin != null && s.durationMin > 0 && dayNum(s.date) <= t).sort((a, b) => a.date.localeCompare(b.date));
   const key = (s: CalibrationSession) => [...new Set(s.sets.map((x) => x.exerciseId))].sort().join('|');
   const out: MastersWin[] = [];
   for (const s of timed.filter((x) => t - dayNum(x.date) < RECENT_DAYS).reverse()) {
@@ -438,6 +444,45 @@ export function healthMarkerWins(input: MastersInput, today: string): MastersWin
   return out;
 }
 
+/* ---------- scored blocks: benchmarks, intervals, race sims ---------- */
+
+/**
+ * A recent result on a scored block that is the best yet (`score_best`), or the best since an era anchor when it isn't
+ * (`era_best`, like lifts). Compared only with the same piece of work and scoring; needs earlier results to beat.
+ */
+export function scoreWins(input: MastersInput, today: string): MastersWin[] {
+  const t = dayNum(today);
+  const anchors = eraAnchors(input, today);
+  const series = new Map<string, { date: string; v: number; label: string; text: string }[]>();
+  for (const s of [...(input.scored ?? [])].filter((x) => dayNum(x.date) <= t).sort((a, b) => a.date.localeCompare(b.date)))
+    for (const r of s.results) {
+      const v = scoreValue(r);
+      if (v == null || r.scoring === 'none') continue;
+      const k = `${r.key}|${r.scoring}`;
+      series.set(k, [...(series.get(k) ?? []), { date: s.date, v, label: r.label, text: scoreText(r) }]);
+    }
+  const out: MastersWin[] = [];
+  for (const [k, pts] of series) {
+    const recent = pts.filter((p) => t - dayNum(p.date) < RECENT_DAYS);
+    if (!recent.length) continue;
+    const top = recent.reduce((a, b) => (b.v > a.v ? b : a));
+    const before = pts.filter((p) => p.date < top.date);
+    if (!before.length) continue;
+    if (top.v > Math.max(...before.map((p) => p.v))) {
+      out.push({ kind: 'score_best', date: top.date, exerciseId: k.split('|')[0], text: `${top.label} ${top.text}: your best yet`, coachText: `${top.label} best yet: ${top.text}`, weight: 82 });
+      continue;
+    }
+    for (const a of anchors) {
+      const inEra = before.filter((p) => p.date >= a.date);
+      if (inEra.length < 2 || !before.some((p) => p.date < a.date)) continue;
+      if (top.v <= Math.max(...inEra.map((p) => p.v))) continue;
+      out.push({ kind: 'era_best', date: top.date, exerciseId: k.split('|')[0], text: `Your best ${top.label} ${a.words}: ${top.text}`, coachText: `Best ${top.label} ${a.words}: ${top.text}`, weight: 70 + Math.min(15, (t - dayNum(a.date)) / 50) });
+      break;
+    }
+  }
+  return out;
+}
+
 /* ---------- putting it together ---------- */
 
 export function mastersWins(input: MastersInput, today: string): MastersWin[] {
@@ -449,6 +494,7 @@ export function mastersWins(input: MastersInput, today: string): MastersWin[] {
     ...densityBests(input, today),
     ...capabilityWins(input, today),
     ...healthMarkerWins(input, today),
+    ...scoreWins(input, today),
   ];
 }
 

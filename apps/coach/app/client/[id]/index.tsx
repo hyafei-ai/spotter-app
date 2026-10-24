@@ -43,6 +43,7 @@ import { isWaiting } from '../../../src/today/useToday';
 import { WhatWorks } from '../../../src/client/WhatWorks';
 import { Timeline } from '../../../src/client/Timeline';
 import { Wins } from '../../../src/client/Wins';
+import { ClientRace, ClientResults } from '../../../src/multisport/ClientResults';
 
 /**
  * K-3 client detail, in the order a coach thinks (docs/ux/coach-experience.md): what works for them (the
@@ -206,6 +207,8 @@ export default function ClientDetail() {
         }
       />
       <Wins client={c} wins={wins} healthVisible={seesHealth} />
+      <ClientResults days={longDays} first={first} />
+      {!sample ? <ClientRace clientId={c.id} first={first} /> : null}
     </>
   );
 

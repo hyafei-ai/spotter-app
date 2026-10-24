@@ -1,6 +1,7 @@
+import { useStyles } from '../../src/multisport/styles';
 import { Linking, View } from 'react-native';
 import { router } from 'expo-router';
-import { PARQ_QUESTIONS } from '@spotter/core';
+import { PARQ_QUESTIONS, TRAINER_STYLE_LABEL } from '@spotter/core';
 import {
   ListRow,
   Monogram,
@@ -27,6 +28,7 @@ export default function Me() {
   const firstRun = useFirstRunPreview();
   const demoTeam = readDemoTeam();
   const name = viewer?.name ?? tenant.coach.name;
+  const styles = useStyles((s) => s.styles);
   return (
     <Screen>
       <ScreenHeader title="Me" />
@@ -40,8 +42,14 @@ export default function Me() {
         title="Intake form"
         subtitle={`${saved.questions.length} of your questions + ${PARQ_QUESTIONS.length} health questions`}
         chevron
-        last
         onPress={() => router.push('/intake-form')}
+      />
+      <ListRow
+        title="Coaching styles"
+        subtitle={styles.length ? styles.map((x) => TRAINER_STYLE_LABEL[x]).join(', ') : 'All styles, in the usual order'}
+        chevron
+        last
+        onPress={() => router.push('/styles')}
       />
       <MeRows />
       {!isConfigured() ? (

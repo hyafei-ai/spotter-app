@@ -27,11 +27,13 @@ import { demoCycleProfile, demoCycleSessions } from './cycle';
 import { demoImportedWorkouts, demoWearableDays } from './wearables';
 import { demoHealthNutritionDays, demoPainLogs } from './fuel';
 import { demoDailyChecks } from './daily';
+import { DEMO_RUTH_ID, multisportDays, multisportMastersInput, multisportPatterns, multisportWins } from './multisport';
 
 /** MOCK: ages for demo clients, by coach-side client id. Names are never used to infer anything. */
 export const DEMO_CLIENT_AGES: Record<string, number> = {
   [DEMO_CLIENTS[0]!.id]: 41,
   [DEMO_CLIENTS[5]!.id]: 52,
+  [DEMO_RUTH_ID]: 58,
 };
 export const DEMO_JORDAN_ID = DEMO_CLIENTS[0]!.id;
 export const DEMO_MEI_ID = DEMO_CLIENTS[5]!.id;
@@ -280,11 +282,12 @@ export function demoClientDays(clientId: string, now = new Date(), opts: DemoDay
   if (clientId === DEMO_MEI_ID) {
     return buildTimeline({ sessions: meiSessions(now), wearables: meiWearables(now) }, from, to);
   }
-  return [];
+  return multisportDays(clientId, now) ?? [];
 }
 
 /** MOCK: "What works for {client}". The cycle pattern only appears with `includeCycle` (the client shares it). */
 export function demoClientPatterns(clientId: string, now = new Date(), opts: DemoDaysOptions = {}): Pattern[] {
+  if (multisportDays(clientId, now)) return multisportPatterns(clientId, now);
   const days = demoClientDays(clientId, now, opts);
   if (!days.length) return [];
   const calibration =
@@ -304,11 +307,12 @@ export function demoMastersInput(clientId: string, now = new Date()): MastersInp
   if (clientId === DEMO_MEI_ID) {
     return { sessions: meiSessions(now), wearables: meiWearables(now), goals: meiGoals(now), birthDate: meiBirthDate(now), coachStart: DEMO_CLIENTS[5]!.startDate };
   }
-  return null;
+  return multisportMastersInput(clientId, now);
 }
 
 /** MOCK: the coach's three wins to mention, and the client's week. */
 export function demoWins(clientId: string, now = new Date()): { mention: MastersWin[]; week: MastersWin[] } {
+  if (multisportDays(clientId, now)) return multisportWins(clientId, now);
   const input = demoMastersInput(clientId, now);
   if (!input) return { mention: [], week: [] };
   const today = isoLocal(0, now);

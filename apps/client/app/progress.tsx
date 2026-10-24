@@ -20,6 +20,7 @@ const KIND_LABEL = {
   resting_hr: 'From your watch',
   hrv_baseline: 'From your watch',
   sleep_regularity: 'From your watch',
+  score_best: 'Best yet',
 } as const;
 
 /**
@@ -28,10 +29,18 @@ const KIND_LABEL = {
  * Everything here comes from logged sets; nothing is rounded up.
  */
 export default function Progress() {
-  const { trends, consistency, phaseAware } = useProgress();
+  const { trends, consistency, phaseAware, histories, scoresFirst } = useProgress();
   const allWins = useWins();
   const back = () => (router.canGoBack() ? router.back() : router.replace('/train'));
-  const empty = allWins.length === 0 && trends.length === 0 && consistency.done === 0;
+  const empty = allWins.length === 0 && trends.length === 0 && consistency.done === 0 && histories.length === 0;
+  const scores = histories.length ? (
+    <>
+      <SectionLabel>Benchmarks and times</SectionLabel>
+      {histories.slice(0, 8).map((h, i, arr) => (
+        <ListRow key={`${h.key}-${h.scoring}`} title={h.line} subtitle={h.trend ?? (h.entries.length === 1 ? 'Do it again to see how it moves' : undefined)} last={i === arr.length - 1} />
+      ))}
+    </>
+  ) : null;
 
   return (
     <Screen>
@@ -48,6 +57,7 @@ export default function Progress() {
         <EmptyState message="Log a few sessions and your progress shows up here." actionLabel="Go to Today" onAction={() => router.push('/today')} />
       ) : (
         <>
+          {scoresFirst ? scores : null}
           <SectionLabel>Consistency</SectionLabel>
           <View style={styles.body}>
             <Text variant="callout">{consistencyText(consistency)}</Text>
@@ -89,6 +99,7 @@ export default function Progress() {
             </Text>
           </View>
 
+          {!scoresFirst ? scores : null}
           <SectionLabel>Estimated max, last 6 weeks</SectionLabel>
           <View style={[styles.body, { gap: space[4] }]}>
             {trends.length ? trends.map((t) => <Trend key={t.exerciseId} t={t} />) : <Text color="ink2">Your main lifts show up here after a few sessions.</Text>}

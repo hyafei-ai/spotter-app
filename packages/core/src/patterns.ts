@@ -1,6 +1,7 @@
 import { PHASE_WORDS } from './cycle';
 import { SHORT_SLEEP_HOURS } from './signals';
-import { MUSCLE_GROUP_WORDS, mainMuscleGroup, type ClientDay, type MuscleGroup, type TimelineSession } from './timeline';
+import { MUSCLE_GROUP_WORDS, mainMuscleGroup, type ClientDay, type MuscleGroup, type TimelineScore, type TimelineSession } from './timeline';
+import { efficiencyFactor } from './endurance';
 import type { Calibration } from './physiology';
 
 /**
@@ -75,7 +76,11 @@ export type PatternKind =
   | 'volume_response'
   | 'mobility_soreness'
   | 'time_of_day'
-  | 'cycle_phase';
+  | 'cycle_phase'
+  | 'conditioning_sleep'
+  | 'conditioning_trend'
+  | 'aerobic_efficiency'
+  | 'compromised_running';
 
 export interface Pattern {
   id: string;
@@ -470,12 +475,210 @@ export function cyclePhasePattern(calibration: Calibration | null | undefined): 
   };
 }
 
+/* ---------- conditioning and aerobic domains (docs/ports.md row 7) ---------- */
+
+/** A scored block on a day, as % better (+) or worse (−) than the client's own median for that same piece of work. */
+interface RelativeScore {
+  i: number;
+  day: ClientDay;
+  score: TimelineScore;
+  rel: number;
+}
+
+/** A piece of work needs this many results before any of them is compared with its median. */
+export const SCORE_MIN_REPEATS = 3;
+
+/**
+ * Every scored block with a comparable value, relative to the median of the same key (blocks.ts blockKey). For time
+ * the sign is flipped, so + is always better. Capped results and unscored blocks are left out.
+ */
+function relativeScores(days: ClientDay[]): RelativeScore[] {
+  const all = days.flatMap((day, i) =>
+    day.training.sessions.flatMap((s) => (s.scores ?? []).filter((sc) => sc.value != null && sc.value > -1e6 && sc.scoring !== 'none').map((score) => ({ i, day, score }))),
+  );
+  const byKey = new Map<string, number[]>();
+  for (const a of all) byKey.set(`${a.score.key}|${a.score.scoring}`, [...(byKey.get(`${a.score.key}|${a.score.scoring}`) ?? []), a.score.value!]);
+  return all.flatMap((a) => {
+    const xs = byKey.get(`${a.score.key}|${a.score.scoring}`)!;
+    if (xs.length < SCORE_MIN_REPEATS) return [];
+    const m = median(xs);
+    return m === 0 ? [] : [{ ...a, rel: ((a.score.value! - m) / Math.abs(m)) * 100 }];
+  });
+}
+
+/** Smallest conditioning difference worth mentioning, in %. */
+export const CONDITIONING_MIN_PCT = 2;
+
+/** conditioning_sleep: scored conditioning after short nights vs after normal nights. */
+export function conditioningSleep(days: ClientDay[]): Pattern | null {
+  const rs = relativeScores(days).filter((r) => r.score.kind !== 'intervals' && r.score.kind !== 'station_race');
+  const after = (want: boolean) => rs.filter((r) => shortNight(days, r.i) === want).map((r) => r.rel);
+  const c = compareMeans(after(true), after(false));
+  if (!c?.confidence || Math.abs(c.diff) < CONDITIONING_MIN_PCT) return null;
+  const worse = c.diff < 0;
+  return {
+    id: 'conditioning_sleep',
+    kind: 'conditioning_sleep',
+    title: `Conditioning scores tend to be ${pct(c.diff)} ${worse ? 'worse' : 'better'} after short nights`,
+    detail: `${plural(c.nA, 'scored workout')} after short nights vs ${c.nB} after normal ones, each against the client’s own usual for that workout`,
+    effect: { value: r1(c.diff), unit: '%' },
+    n: { a: c.nA, b: c.nB },
+    confidence: confidenceOf(c),
+    suggestion: worse ? 'After a short night, keep the workout but drop the goal of a best score: pace it, don’t race it.' : 'Nothing to change; short nights don’t show in the scores.',
+    domains: ['sleep', 'conditioning'],
+  };
+}
+
+/** Weeks compared in the conditioning trend: the most recent block against the one before. */
+export const TREND_BLOCK_WEEKS = 8;
+
+/** conditioning_trend: the client's scored conditioning in the last 8 weeks against the 8 before, against their own usual. */
+export function conditioningTrend(days: ClientDay[]): Pattern | null {
+  const last = days.at(-1);
+  if (!last) return null;
+  const t = dayNum(last.date);
+  const rs = relativeScores(days).filter((r) => r.score.kind !== 'intervals');
+  const span = TREND_BLOCK_WEEKS * 7;
+  const recent = rs.filter((r) => t - dayNum(r.day.date) < span).map((r) => r.rel);
+  const before = rs.filter((r) => t - dayNum(r.day.date) >= span && t - dayNum(r.day.date) < 2 * span).map((r) => r.rel);
+  const c = compareMeans(recent, before);
+  if (!c?.confidence || Math.abs(c.diff) < CONDITIONING_MIN_PCT) return null;
+  const up = c.diff > 0;
+  return {
+    id: 'conditioning_trend',
+    kind: 'conditioning_trend',
+    title: `Benchmarks and WODs are scoring ${pct(c.diff)} ${up ? 'better' : 'worse'} than ${TREND_BLOCK_WEEKS} weeks before`,
+    detail: `${plural(c.nA, 'scored workout')} in the last ${TREND_BLOCK_WEEKS} weeks vs ${c.nB} in the ${TREND_BLOCK_WEEKS} before, each against the client’s own usual for that workout`,
+    effect: { value: r1(c.diff), unit: '%' },
+    n: { a: c.nA, b: c.nB },
+    confidence: confidenceOf(c),
+    suggestion: up ? 'Keep the current mix; retest a benchmark to show the client.' : 'Check recovery and the week’s load before the next benchmark.',
+    domains: ['conditioning'],
+  };
+}
+
+/** Distance reps shorter than this aren't used for pace at heart rate (too short for heart rate to settle). */
+export const EFFICIENCY_MIN_M = 400;
+/** Weeks compared for pace at the same heart rate. */
+export const EFFICIENCY_WEEKS = 4;
+
+/**
+ * aerobic_efficiency: pace at the same heart rate. Each run or interval rep with a distance and an average heart rate
+ * gives an efficiency factor (speed in m/min ÷ heart rate, endurance.ts); the last 4 weeks are compared with the 4
+ * before. Reps from Spotter sessions only (heart rate from the watch).
+ */
+export function aerobicEfficiency(days: ClientDay[]): Pattern | null {
+  const last = days.at(-1);
+  if (!last) return null;
+  const t = dayNum(last.date);
+  // Like with like: each rep's efficiency against the median of the same workout's reps (an easy 7 km and a
+  // threshold kilometre aren't compared with each other), in %.
+  const raw = days.flatMap((day) =>
+    day.training.sessions.flatMap((s) =>
+      (s.scores ?? [])
+        .filter((sc) => sc.kind === 'intervals')
+        .flatMap((sc) =>
+          sc.splits
+            .filter((x) => x.distanceM != null && x.distanceM >= EFFICIENCY_MIN_M && x.avgHr != null && x.sec > 0)
+            .map((x) => ({ key: sc.key, age: t - dayNum(day.date), ef: efficiencyFactor(x.distanceM! / (x.sec / 60), x.avgHr!) }))
+            .filter((x): x is { key: string; age: number; ef: number } => x.ef != null),
+        ),
+    ),
+  );
+  const span = EFFICIENCY_WEEKS * 7;
+  const inWindow = raw.filter((r) => r.age < 2 * span);
+  const medians = new Map<string, number>();
+  for (const k of new Set(inWindow.map((r) => r.key))) medians.set(k, median(inWindow.filter((r) => r.key === k).map((r) => r.ef)));
+  const rel = inWindow.map((r) => ({ age: r.age, pct: (r.ef / medians.get(r.key)! - 1) * 100 }));
+  const recent = rel.filter((r) => r.age < span).map((r) => r.pct);
+  const before = rel.filter((r) => r.age >= span).map((r) => r.pct);
+  const c = compareMeans(recent, before);
+  if (!c?.confidence) return null;
+  const change = c.diff;
+  if (Math.abs(change) < CONDITIONING_MIN_PCT) return null;
+  const faster = change > 0;
+  return {
+    id: 'aerobic_efficiency',
+    kind: 'aerobic_efficiency',
+    title: `Running ${pct(change)} ${faster ? 'faster' : 'slower'} at the same heart rate than a month before`,
+    detail: `${c.nA} runs and reps in the last ${EFFICIENCY_WEEKS} weeks vs ${c.nB} in the ${EFFICIENCY_WEEKS} before, each against the same workout’s usual (speed ÷ average heart rate, ${EFFICIENCY_MIN_M} m or more)`,
+    effect: { value: r1(change), unit: '%' },
+    n: { a: c.nA, b: c.nB },
+    confidence: confidenceOf(c),
+    suggestion: faster ? 'The aerobic base is building: keep the easy running easy.' : 'Look at sleep, heat and fuelling before adding more hard running.',
+    domains: ['aerobic', 'training'],
+  };
+}
+
+/**
+ * Simulations needed before the compromised-running pattern speaks. An exception to MIN_GROUP_N: a client does a full
+ * simulation every couple of weeks, so the station's group is one run per simulation.
+ */
+export const COMPROMISED_MIN_SIMS = 4;
+
+/**
+ * compromised_running: across race simulations, the runs straight after one station against the client's other runs
+ * (each as % slower than that simulation's first run; hyrox.ts compromised running). The station with the biggest
+ * average drop is tested.
+ */
+export function compromisedRunningPattern(days: ClientDay[]): Pattern | null {
+  const sims = days.flatMap((d) => d.training.sessions.flatMap((s) => (s.scores ?? []).filter((sc) => sc.kind === 'station_race')));
+  const after = new Map<string, number[]>();
+  const all: { station: string; pct: number }[] = [];
+  for (const sim of sims) {
+    let prev: string | null = null;
+    let first: number | null = null;
+    for (const x of sim.splits) {
+      if (x.kind === 'station') prev = x.name;
+      if (x.kind !== 'run' || !x.sec) continue;
+      const pace = x.sec / ((x.distanceM ?? 1000) / 1000);
+      if (first == null) {
+        first = pace;
+        continue;
+      }
+      if (!prev) continue;
+      const v = (pace / first - 1) * 100;
+      after.set(prev, [...(after.get(prev) ?? []), v]);
+      all.push({ station: prev, pct: v });
+    }
+  }
+  const top = [...after.entries()].filter(([, xs]) => xs.length >= COMPROMISED_MIN_SIMS).sort((a, b) => mean(b[1]) - mean(a[1]))[0];
+  if (!top) return null;
+  const others = all.filter((x) => x.station !== top[0]).map((x) => x.pct);
+  const c = compareMeans(top[1], others, COMPROMISED_MIN_SIMS);
+  if (!c?.confidence || c.diff < 3) return null;
+  const station = top[0].toLowerCase().replace(/^skierg$/, 'the SkiErg');
+  return {
+    id: `compromised_running:${top[0]}`,
+    kind: 'compromised_running',
+    title: `Runs after ${station} tend to be ${pct(c.diff)} slower than the other runs`,
+    detail: `${plural(c.nA, 'run')} after ${station} vs ${c.nB} other runs, across ${plural(sims.length, 'race simulation')}, each against that simulation’s first run`,
+    effect: { value: r1(c.diff), unit: '%' },
+    n: { a: c.nA, b: c.nB },
+    confidence: confidenceOf(c),
+    suggestion: `Practise running straight off ${station}: short ${station} efforts into 400–800 m at race pace.`,
+    domains: ['race', 'aerobic'],
+  };
+}
+
 export interface PatternOptions {
   /** The client's cycle calibration, only when the client shares it. */
   calibration?: Calibration | null;
 }
 
-export const DETECTORS: ((days: ClientDay[]) => Pattern | null)[] = [recoveryTime, sleepPerformance, sleepRpe, fuelPerformance, volumeResponse, mobilitySoreness, timeOfDay];
+export const DETECTORS: ((days: ClientDay[]) => Pattern | null)[] = [
+  recoveryTime,
+  sleepPerformance,
+  sleepRpe,
+  fuelPerformance,
+  volumeResponse,
+  mobilitySoreness,
+  timeOfDay,
+  conditioningSleep,
+  conditioningTrend,
+  aerobicEfficiency,
+  compromisedRunningPattern,
+];
 
 /** Every pattern the data supports (medium or high confidence), most confident first, then biggest effect. */
 export function findPatterns(days: ClientDay[], opts: PatternOptions = {}): Pattern[] {

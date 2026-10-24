@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { uuidv7 } from './ids';
 import { estimatedOneRepMax } from './records';
 import { roundToIncrement } from './units';
-import { ExerciseMetric, ProgressionRule, type LoggedSet, type ProgramExercise, type SessionPlan } from './schemas';
+import { Block, DayBrief, ExerciseMetric, ProgressionRule, type LoggedSet, type ProgramExercise, type SessionPlan } from './schemas';
+import { blockProblems, blockLabel, cloneBlock, legacyStrengthBlock, needsResult, type StrengthLine } from './blocks';
 
 export * from './library';
 
@@ -52,6 +53,23 @@ export const ProgramExerciseDef = z.object({
 });
 export type ProgramExerciseDef = z.infer<typeof ProgramExerciseDef>;
 
+/**
+ * Strategy & Stimulus for a day (docs/ports.md row 8): an AI draft or the coach's own words. Clients only ever see it
+ * once `status` is 'approved' (resolveDay drops drafts; SQL keeps drafts in a coach-only table).
+ */
+export const DayBriefState = DayBrief.extend({
+  status: z.enum(['draft', 'approved']),
+  source: z.enum(['ai', 'coach']),
+  updatedAt: z.string(),
+});
+export type DayBriefState = z.infer<typeof DayBriefState>;
+
+/**
+ * Day model versions. v1 (no `v`): `exercises` only. v2: `blocks` in order, where a strength block points at
+ * `exercises` by id, so v1 readers still see every exercise and v2 readers see the session's parts.
+ */
+export const DAY_MODEL_VERSION = 2 as const;
+
 export const ProgramDay = z.object({
   id: z.string(),
   title: z.string(),
@@ -59,6 +77,10 @@ export const ProgramDay = z.object({
   weekday: z.number().int().min(1).max(7),
   coachNote: z.string().max(500).nullable(),
   exercises: z.array(ProgramExerciseDef),
+  /** Model version: absent on days saved before blocks (read them with `dayBlocks` / `migrateDay`). */
+  v: z.literal(DAY_MODEL_VERSION).optional(),
+  blocks: z.array(Block).max(40).optional(),
+  brief: DayBriefState.nullable().optional(),
 });
 export type ProgramDay = z.infer<typeof ProgramDay>;
 
@@ -148,6 +170,8 @@ export function dayFor(a: Assignment, date: string): DayLookup {
   const override = a.overrides[date];
   if (override) return { kind: 'session', day: override, weekIndex, overridden: true };
   const program = versionFor(a, date).program;
+  // A program with no weeks holds single sessions only (sent one date at a time): other days are rest days.
+  if (program.weeks.length === 0) return { kind: 'rest', weekIndex };
   if (weekIndex >= program.weeks.length) return { kind: 'finished' };
   const day = program.weeks[weekIndex]!.days.find((d) => d.weekday === weekdayOf(date));
   return day ? { kind: 'session', day, weekIndex, overridden: false } : { kind: 'rest', weekIndex };
@@ -179,12 +203,18 @@ export function resolveLoadKg(set: ProgramSet, e1rm: number | undefined, increme
 
 /** One program day → the SessionPlan the client's logger runs on `date`. */
 export function resolveDay(day: ProgramDay, date: string, e1rm: Record<string, number>, incrementKg = 2.5): SessionPlan {
+  const migrated = migrateDay(day);
+  const blocks = migrated.blocks!.map((b) => resolveBlockLoads(b, e1rm, incrementKg));
+  const brief = day.brief?.status === 'approved' ? { stimulus: day.brief.stimulus, strategy: day.brief.strategy } : null;
   return {
     programDayId: day.id,
     title: day.title.trim() || 'Session',
     scheduledDate: date,
     coachNote: day.coachNote,
-    exercises: day.exercises.map(
+    // A plain strength day keeps the exact shape it always had; anything else carries its blocks.
+    ...(isPlainStrength(migrated) ? {} : { blocks }),
+    ...(brief ? { brief } : {}),
+    exercises: migrated.exercises.map(
       (e): ProgramExercise => ({
         id: e.id,
         exerciseId: e.exerciseId,
@@ -212,6 +242,139 @@ export function resolveDay(day: ProgramDay, date: string, e1rm: Record<string, n
     ),
   };
 }
+
+/** % of max on a block movement → a load from the client's own estimated max, when known. */
+function resolveBlockLoads(b: Block, e1rm: Record<string, number>, incrementKg: number): Block {
+  if (!('movements' in b)) return b;
+  return {
+    ...b,
+    movements: b.movements.map((m) =>
+      m.pct1rm != null && m.loadKg == null && m.movementId && e1rm[m.movementId] != null
+        ? { ...m, loadKg: roundToIncrement(e1rm[m.movementId]! * m.pct1rm, incrementKg) }
+        : m,
+    ),
+  } as Block;
+}
+
+/* ---------- blocks on a day: reading old shapes, keeping the two lists in step ---------- */
+
+/** One strength block holding every exercise, with no title or note: a day as it was before blocks. */
+export function isPlainStrength(day: Pick<ProgramDay, 'blocks'>): boolean {
+  const bs = day.blocks ?? [];
+  return bs.length === 0 || (bs.length === 1 && bs[0]!.kind === 'strength' && !bs[0]!.title && !bs[0]!.note);
+}
+
+/**
+ * Any day (v1 or v2) → a v2 day whose blocks and exercises agree. Lossless: exercises are never changed or dropped.
+ * - v1: every exercise goes into one strength block (id `<dayId>:strength`, stable).
+ * - v2: strength references to missing exercises are dropped; exercises no strength block mentions are added to
+ *   the last strength block (or a new one at the end); `exercises` is put in block order so set order, supersets
+ *   and the watch's step order stay the same everywhere.
+ */
+export function migrateDay(day: ProgramDay): ProgramDay {
+  if (day.v !== DAY_MODEL_VERSION || !day.blocks) {
+    const blocks = day.exercises.length ? [legacyStrengthBlock(day.id, day.exercises.map((e) => e.id))] : [];
+    return { ...day, v: DAY_MODEL_VERSION, blocks };
+  }
+  const ids = new Set(day.exercises.map((e) => e.id));
+  let blocks: Block[] = day.blocks.map((b) => (b.kind === 'strength' ? { ...b, exerciseIds: b.exerciseIds.filter((id) => ids.has(id)) } : b));
+  const referenced = new Set(blocks.flatMap((b) => (b.kind === 'strength' ? b.exerciseIds : [])));
+  const orphans = day.exercises.filter((e) => !referenced.has(e.id)).map((e) => e.id);
+  if (orphans.length) {
+    const last = [...blocks].reverse().find((b) => b.kind === 'strength');
+    blocks = last
+      ? blocks.map((b) => (b === last && b.kind === 'strength' ? { ...b, exerciseIds: [...b.exerciseIds, ...orphans] } : b))
+      : [...blocks, legacyStrengthBlock(day.id, orphans)];
+  }
+  const order = blocks.flatMap((b) => (b.kind === 'strength' ? b.exerciseIds : []));
+  const byId = new Map(day.exercises.map((e) => [e.id, e]));
+  const seen = new Set<string>();
+  const exercises = order.filter((id) => (seen.has(id) ? false : (seen.add(id), true))).map((id) => byId.get(id)!);
+  return { ...day, blocks, exercises };
+}
+
+/** The day's blocks, reading old shapes. */
+export const dayBlocks = (day: ProgramDay): Block[] => migrateDay(day).blocks!;
+
+/** Every day of a program as v2. Old programs read from storage go through this once. */
+export function migrateProgram(p: Program): Program {
+  return { ...p, weeks: p.weeks.map((w) => ({ ...w, days: w.days.map(migrateDay) })) };
+}
+
+/** Replace a day's blocks (and keep exercises in step: exercises no block mentions any more are removed). */
+export function setDayBlocks(day: ProgramDay, blocks: Block[]): ProgramDay {
+  const keep = new Set(blocks.flatMap((b) => (b.kind === 'strength' ? b.exerciseIds : [])));
+  return migrateDay({ ...day, v: DAY_MODEL_VERSION, blocks, exercises: day.exercises.filter((e) => keep.has(e.id)) });
+}
+
+export const updateDayBlock = (day: ProgramDay, blockId: string, fn: (b: Block) => Block): ProgramDay =>
+  setDayBlocks(day, dayBlocks(day).map((b) => (b.id === blockId ? fn(b) : b)));
+
+export const removeDayBlock = (day: ProgramDay, blockId: string): ProgramDay => setDayBlocks(day, dayBlocks(day).filter((b) => b.id !== blockId));
+
+export const moveDayBlock = (day: ProgramDay, index: number, delta: -1 | 1): ProgramDay => setDayBlocks(day, move(dayBlocks(day), index, delta));
+
+/** Add an exercise to a strength block (`blockId`, else the last one, else a new one at the end). */
+export function addExerciseToDay(day: ProgramDay, pe: ProgramExerciseDef, blockId?: string | null): ProgramDay {
+  const blocks = dayBlocks(day);
+  const target = blocks.find((b) => b.id === blockId && b.kind === 'strength') ?? [...blocks].reverse().find((b) => b.kind === 'strength');
+  const next: Block[] = target
+    ? blocks.map((b) => (b.id === target.id && b.kind === 'strength' ? { ...b, exerciseIds: [...b.exerciseIds, pe.id] } : b))
+    : [...blocks, { ...legacyStrengthBlock(day.id, [pe.id]), id: uuidv7() }];
+  return setDayBlocks({ ...day, exercises: [...day.exercises, pe] }, next);
+}
+
+/** Add blocks at the end; strength lines from a paste become exercises via `exerciseFor`. */
+export function addBlocksToDay(
+  day: ProgramDay,
+  input: { blocks: Block[]; strength: StrengthLine[] },
+  exerciseFor: (line: StrengthLine) => { id: string; name: string; metric: ExerciseMetric },
+  newId: () => string = uuidv7,
+): ProgramDay {
+  const made = input.strength.map((line) => strengthExercise(line, exerciseFor(line), newId));
+  const blocks = input.blocks.map((b) =>
+    b.kind === 'strength' ? { ...b, exerciseIds: b.exerciseIds.map((ref) => (ref.startsWith('line:') ? made[Number(ref.slice(5))]?.id : ref)).filter((x): x is string => !!x) } : b,
+  );
+  return setDayBlocks({ ...day, exercises: [...day.exercises, ...made] }, [...dayBlocks(day), ...blocks]);
+}
+
+/** A pasted strength line → an exercise with one set per rep count. */
+export function strengthExercise(line: StrengthLine, ex: { id: string; name: string; metric: ExerciseMetric }, newId: () => string = uuidv7): ProgramExerciseDef {
+  const base = newExercise(ex, newId);
+  const weighted = ex.metric === 'weight_reps';
+  return {
+    ...base,
+    note: line.note,
+    trackRpe: line.rpe != null,
+    sets: line.reps.map((r) => ({
+      ...emptySet(ex.metric),
+      repsMin: r ?? base.sets[0]!.repsMin,
+      repsMax: r ?? base.sets[0]!.repsMax,
+      loadType: weighted ? (line.pct1rm != null ? 'pct_1rm' : line.rpe != null && line.loadKg == null ? 'rpe' : 'absolute') : 'bodyweight',
+      loadValue: weighted ? (line.pct1rm ?? line.loadKg) : null,
+      rpe: line.rpe,
+    })),
+  };
+}
+
+/** Problems with one day's blocks, in plain words (used by programProblems and the day editor). */
+export function dayBlockProblems(day: ProgramDay): string[] {
+  return dayBlocks(day).flatMap((b) => blockProblems(b));
+}
+
+/** A day "has content" when it has an exercise or a block a client can do. */
+export const dayHasContent = (day: ProgramDay) => day.exercises.length > 0 || dayBlocks(day).some((b) => b.kind !== 'strength' && b.kind !== 'note');
+
+/** Names for the program editor's day row: exercises and block labels in order. */
+export function dayContentNames(day: ProgramDay): string[] {
+  const names = new Map(day.exercises.map((e) => [e.id, e.name]));
+  return dayBlocks(day)
+    .flatMap((b) => (b.kind === 'strength' ? b.exerciseIds.map((id) => names.get(id) ?? '') : b.kind === 'note' ? [] : [blockLabel(b)]))
+    .filter(Boolean);
+}
+
+/** True when a published day should get a Strategy & Stimulus draft: it has conditioning, intervals or a race part. */
+export const dayWantsBrief = (day: ProgramDay) => dayBlocks(day).some(needsResult);
 
 /* ---------- editing ---------- */
 
@@ -244,7 +407,7 @@ export function newExercise(ex: { id: string; name: string; metric: ExerciseMetr
 }
 
 export function newDay(weekday: number, title: string, newId: () => string = uuidv7): ProgramDay {
-  return { id: newId(), title, weekday, coachNote: null, exercises: [] };
+  return { id: newId(), title, weekday, coachNote: null, exercises: [], v: DAY_MODEL_VERSION, blocks: [] };
 }
 
 export function newProgram(name: string, now = new Date().toISOString(), newId: () => string = uuidv7): Program {
@@ -253,17 +416,25 @@ export function newProgram(name: string, now = new Date().toISOString(), newId: 
 
 /** Copies get fresh ids everywhere so they can live side by side in the database. */
 export function cloneDay(day: ProgramDay, newId: () => string = uuidv7): ProgramDay {
-  return {
-    ...day,
-    id: newId(),
-    exercises: day.exercises.map((e) => ({
+  const src = migrateDay(day);
+  const ids = new Map<string, string>();
+  const id = newId();
+  const exercises = src.exercises.map((e) => {
+    const eid = newId();
+    ids.set(e.id, eid);
+    return {
       ...e,
-      id: newId(),
+      id: eid,
       sets: e.sets.map((s) => ({ ...s })),
       alternatives: e.alternatives.map((a) => ({ ...a })),
       progressionRule: e.progressionRule ? { ...e.progressionRule, id: newId() } : null,
-    })),
-  };
+    };
+  });
+  const blocks = src.blocks!.map((b) => {
+    const c = cloneBlock(b, newId);
+    return c.kind === 'strength' ? { ...c, exerciseIds: c.exerciseIds.map((x) => ids.get(x) ?? x) } : c;
+  });
+  return { ...src, id, exercises, blocks, ...(src.brief ? { brief: { ...src.brief } } : {}) };
 }
 
 export function cloneWeek(week: ProgramWeek, newId: () => string = uuidv7): ProgramWeek {
@@ -449,6 +620,13 @@ export interface ProgramProblem {
   message: string;
 }
 
+/** The program that holds single sessions for a client with no program (no weeks; see dayFor). */
+export function singleSessionsProgram(coachFirst: string, now = new Date().toISOString(), newId: () => string = uuidv7): Program {
+  return { id: newId(), name: `Single sessions from ${coachFirst}`, status: 'published', isTemplate: false, version: 1, source: 'coach', weeks: [], updatedAt: now };
+}
+
+export const isSingleSessions = (p: Program) => p.weeks.length === 0 && p.status === 'published';
+
 export function programProblems(p: Program): ProgramProblem[] {
   const out: ProgramProblem[] = [];
   if (!p.name.trim()) out.push({ where: {}, message: 'Give the program a name.' });
@@ -462,7 +640,8 @@ export function programProblems(p: Program): ProgramProblem[] {
       if (weekdays.has(d.weekday)) out.push({ where, message: `${at} has two sessions.` });
       weekdays.add(d.weekday);
       if (!d.title.trim()) out.push({ where, message: `${at} needs a name.` });
-      if (d.exercises.length === 0) out.push({ where, message: `${at} has no exercises.` });
+      if (!dayHasContent(d)) out.push({ where, message: `${at} has nothing in it yet.` });
+      for (const m of dayBlockProblems(d)) out.push({ where, message: `${at}, ${m.charAt(0).toLowerCase()}${m.slice(1)}` });
       for (const e of d.exercises) {
         const ex = `${at}, ${e.name}`;
         const at3 = { ...where, exerciseId: e.id };

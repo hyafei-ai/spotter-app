@@ -12,14 +12,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { Feather } from '@expo/vector-icons';
 import {
+  blockLabel,
   defaultEntry,
+  formatRaceTime,
   formatRestClock,
   fromDisplay,
   indexLogged,
+  isStrengthOnly,
   nextSlot,
+  nextStep,
+  planBlocks,
   roundToIncrement,
+  runnerSpec,
+  runnerView,
+  sessionProgress,
   setKey,
   toDisplay,
+  type Block,
   type ProgramExercise,
   type SetKey,
 } from '@spotter/core';
@@ -46,6 +55,7 @@ import { isOn } from '../../../src/modules';
 import { prescribed, resultText, targetText, w } from '../../../src/format';
 import { previousSet, suggestionFor, useApp } from '../../../src/store';
 import { useSessionCalibration } from '../../../src/cycle/hooks';
+import { BlockSection } from '../../../src/blocks/BlockSection';
 
 interface Entry {
   weightKg: number | null;
@@ -67,14 +77,28 @@ export default function Logger() {
 
   const session = active && active.sessionId === id ? active : null;
   const logged = useMemo(() => indexLogged(session?.sets ?? []), [session?.sets]);
-  const next = session ? nextSlot(session.plan, logged) : null;
+  // Blocks (docs/ux/multisport.md 5.7): a strength-only plan runs exactly as before; otherwise the next thing to do
+  // can be a set or a whole block (an AMRAP, intervals, a race sim…).
+  const strengthOnly = session ? isStrengthOnly(session.plan) : true;
+  const plan = session?.plan ?? null;
+  const blocks = useMemo(() => (plan ? planBlocks(plan) : []), [plan]);
+  const results = useMemo(() => session?.results ?? [], [session?.results]);
+  const step = session && !strengthOnly ? nextStep(session.plan, session.sets, results) : null;
+  const nextKey: SetKey | null = session ? (strengthOnly ? (nextSlot(session.plan, logged)?.key ?? null) : step?.kind === 'set' ? setKey(step.programExerciseId, step.setIndex) : null) : null;
+  // Primitives only from `step`, so the React Compiler can keep the memoized entry below.
+  const nextBlockId: string | null = step?.kind === 'block' ? step.block.id : null;
+  const nextBlockStart: string | null = step?.kind === 'block' ? startLabel(step.block) : null;
+  const progress = plan ? sessionProgress(plan, session?.sets ?? [], results) : { done: 0, planned: 0, sets: 0, blocks: 0 };
+  // A block timer left running (the client stepped back to the sheet): one line to get back to it.
+  const runner = session?.runner ?? null;
+  const runningBlock = runner ? (blocks.find((b) => b.id === runner.blockId) ?? null) : null;
 
   const [selected, setSelected] = useState<SetKey | null>(null);
   const [justLogged, setJustLogged] = useState<SetKey | null>(null);
   const [swapFor, setSwapFor] = useState<ProgramExercise | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
-  const currentKey: SetKey | null = selected ?? next?.key ?? null;
+  const currentKey: SetKey | null = selected ?? nextKey;
   const current = useMemo(() => {
     if (!session || !currentKey) return null;
     const [peId, idx] = currentKey.split(':');
@@ -135,7 +159,16 @@ export default function Logger() {
     const t = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(t);
   }, [session?.restEndsAt]);
+  // A block timer running in the background: keep its line on the sheet current.
+  const runnerLive = !!session?.runner && session.runner.state.startedAt != null && !session.runner.state.ended && session.runner.state.pausedAt == null;
+  useEffect(() => {
+    if (!runnerLive) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [runnerLive]);
   const restLeft = session?.restEndsAt ? Math.max(0, (session.restEndsAt - now) / 1000) : 0;
+  const runningSpec = runningBlock ? runnerSpec(runningBlock) : null;
+  const runningView = runningSpec && runner ? runnerView(runningSpec, runner.state, now) : null;
   useEffect(() => {
     if (session?.restEndsAt && restLeft <= 0) setRest(null, null);
   }, [restLeft, session?.restEndsAt, setRest]);
@@ -152,9 +185,12 @@ export default function Logger() {
     );
   }
 
-  const planned = session.plan.exercises.reduce((n, e) => n + e.sets.length, 0);
-  const allDone = logged.size >= planned;
+  const planned = strengthOnly ? session.plan.exercises.reduce((n, e) => n + e.sets.length, 0) : progress.planned;
+  const allDone = strengthOnly ? logged.size >= planned : progress.done >= progress.planned;
   const isEdit = current ? logged.has(current.key) : false;
+  const first = tenant.coach.name.split(' ')[0] ?? '';
+  const openBlock = (blockId: string, scoreOnly = false) => router.push(`/session/${session.sessionId}/block/${blockId}${scoreOnly ? '?score=1' : ''}`);
+
 
   const skipRest = async () => {
     const nid = session.restNotificationId;
@@ -210,14 +246,26 @@ export default function Logger() {
           },
     });
     if (!isEdit) {
-      const after = nextSlot(session.plan, new Map([...logged, [key, {} as never]]));
-      void startRest(
-        e.restS,
-        after ? (session.swaps[after.exercise.id]?.name ?? after.exercise.name) : null,
-      );
-      if (after && after.exercise.id !== e.id) {
-        const y = blockY.current[after.exercise.id];
-        if (y != null) scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
+      if (strengthOnly) {
+        const after = nextSlot(session.plan, new Map([...logged, [key, {} as never]]));
+        void startRest(
+          e.restS,
+          after ? (session.swaps[after.exercise.id]?.name ?? after.exercise.name) : null,
+        );
+        if (after && after.exercise.id !== e.id) {
+          const y = blockY.current[after.exercise.id];
+          if (y != null) scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
+        }
+      } else {
+        const after = nextStep(session.plan, [...session.sets, { programExerciseId: e.id, setIndex: current.setIndex }], results);
+        const afterName = after?.kind === 'set' ? (session.plan.exercises.find((x) => x.id === after.programExerciseId)?.name ?? null) : after?.kind === 'block' ? blockLabel(after.block) : null;
+        // No rest timer before a timed block: its own clock starts when the client is ready.
+        if (after?.kind !== 'block') void startRest(e.restS, afterName);
+        const target = after?.kind === 'set' ? after.programExerciseId : after?.kind === 'block' ? after.block.id : null;
+        if (target && target !== e.id) {
+          const y = blockY.current[target];
+          if (y != null) scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
+        }
       }
     }
   };
@@ -225,47 +273,7 @@ export default function Logger() {
   const unit = tenant.units;
   const inc = tenant.weightIncrement;
 
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.paper, paddingTop: insets.top }}>
-      <View style={styles.header}>
-        <IconButton
-          icon="x"
-          label="Close. Your session stays open."
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/today'))}
-        />
-        <View style={{ flex: 1 }}>
-          <Text variant="title" accessibilityRole="header" numberOfLines={1}>
-            {session.plan.title}
-          </Text>
-          <Text variant="caption" color="ink2">
-            {logged.size} of {planned} sets
-          </Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push(`/session/${session.sessionId}/finish`)}
-          hitSlop={8}
-          style={styles.finishLink}
-        >
-          <Text variant="bodyStrong" style={{ color: colors.brand }}>
-            Finish
-          </Text>
-        </Pressable>
-      </View>
-      <SyncBanner />
-
-      <ScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: space[12] }}>
-        {cal.line ? (
-          <View style={[styles.suggest, { borderLeftColor: colors.brand, backgroundColor: colors.surface }]} accessibilityLiveRegion="polite">
-            <Text variant="callout">{cal.active ? cal.line : 'Using planned loads today.'}</Text>
-            <Pressable onPress={() => cal.setOff(cal.active)} accessibilityRole="button" hitSlop={8} style={{ alignSelf: 'flex-start', paddingVertical: space[1] }}>
-              <Text variant="bodyStrong" style={{ color: colors.brand }}>
-                {cal.active ? 'Use planned loads instead' : 'Use your cycle-adjusted loads'}
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
-        {session.plan.exercises.map((e) => {
+  const renderExercise = (e: ProgramExercise) => {
           const s = suggestion(e);
           const swap = session.swaps[e.id];
           return (
@@ -397,7 +405,71 @@ export default function Logger() {
               })}
             </View>
           );
-        })}
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.paper, paddingTop: insets.top }}>
+      <View style={styles.header}>
+        <IconButton
+          icon="x"
+          label="Close. Your session stays open."
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/today'))}
+        />
+        <View style={{ flex: 1 }}>
+          <Text variant="title" accessibilityRole="header" numberOfLines={1}>
+            {session.plan.title}
+          </Text>
+          <Text variant="caption" color="ink2">
+            {strengthOnly ? `${logged.size} of ${planned} sets` : `${progress.done} of ${progress.planned} done`}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push(`/session/${session.sessionId}/finish`)}
+          hitSlop={8}
+          style={styles.finishLink}
+        >
+          <Text variant="bodyStrong" style={{ color: colors.brand }}>
+            Finish
+          </Text>
+        </Pressable>
+      </View>
+      <SyncBanner />
+
+      <ScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: space[12] }}>
+        {cal.line ? (
+          <View style={[styles.suggest, { borderLeftColor: colors.brand, backgroundColor: colors.surface }]} accessibilityLiveRegion="polite">
+            <Text variant="callout">{cal.active ? cal.line : 'Using planned loads today.'}</Text>
+            <Pressable onPress={() => cal.setOff(cal.active)} accessibilityRole="button" hitSlop={8} style={{ alignSelf: 'flex-start', paddingVertical: space[1] }}>
+              <Text variant="bodyStrong" style={{ color: colors.brand }}>
+                {cal.active ? 'Use planned loads instead' : 'Use your cycle-adjusted loads'}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {runningBlock && runningView && runningView.phase !== 'done' ? (
+          <Pressable
+            onPress={() => openBlock(runningBlock.id)}
+            accessibilityRole="button"
+            style={[styles.suggest, { borderLeftColor: colors.brand, backgroundColor: colors.surface }]}
+          >
+            <Text variant="bodyStrong">{`${blockLabel(runningBlock)} is running · ${formatRaceTime(runningView.clockSec) === '—' ? '0:00' : formatRaceTime(runningView.clockSec)}`}</Text>
+            <Text variant="bodyStrong" style={{ color: colors.brand }}>
+              Back to the timer
+            </Text>
+          </Pressable>
+        ) : null}
+        {strengthOnly
+          ? session.plan.exercises.map((e) => renderExercise(e))
+          : blocks.map((b) =>
+              b.kind === 'strength' ? (
+                <View key={b.id}>{b.exerciseIds.map((x) => session.plan.exercises.find((e) => e.id === x)).filter((e): e is ProgramExercise => !!e).map((e) => renderExercise(e))}</View>
+              ) : (
+                <View key={b.id} onLayout={(ev) => (blockY.current[b.id] = ev.nativeEvent.layout.y)}>
+                  <BlockSection block={b} result={results.find((r) => r.blockId === b.id) ?? null} isNext={nextBlockId === b.id && !current} first={first} onScore={() => openBlock(b.id, true)} />
+                </View>
+              ),
+            )}
       </ScrollView>
 
       <View
@@ -434,6 +506,8 @@ export default function Logger() {
             icon="check"
             onPress={() => void log()}
           />
+        ) : nextBlockId && nextBlockStart ? (
+          <Button label={nextBlockStart} icon="play" onPress={() => openBlock(nextBlockId)} />
         ) : allDone ? (
           <Button
             label="Finish session"
@@ -491,6 +565,32 @@ export default function Logger() {
       </Sheet>
     </View>
   );
+}
+
+/** The pinned button for a block that's next: "Start AMRAP 12:00", "Start intervals", "Start race sim", "Enter score". */
+function startLabel(b: Block): string {
+  switch (b.kind) {
+    case 'amrap':
+      return `Start AMRAP ${formatRaceTime(b.durationSec)}`;
+    case 'emom':
+      return `Start EMOM ${formatRaceTime(b.intervalSec * b.rounds)}`;
+    case 'tabata':
+      return 'Start tabata';
+    case 'interval_amrap':
+      return `Start ${b.rounds} × AMRAP`;
+    case 'intervals':
+      return 'Start intervals';
+    case 'station_race':
+      return 'Start race sim';
+    case 'timed':
+      return `Start ${formatRaceTime(b.durationSec)}`;
+    case 'for_time':
+    case 'rounds_for_time':
+    case 'rep_scheme':
+      return `Start ${blockLabel(b)}`;
+    default:
+      return 'Enter score';
+  }
 }
 
 function summary(e: ProgramExercise, entry: Entry): string {

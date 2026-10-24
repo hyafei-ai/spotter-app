@@ -6,7 +6,9 @@ import {
   maxObservedHr,
   watchBranding,
   watchBriefFrom,
+  watchBlockOrigins,
   watchPlanFromSession,
+  type WatchBlockOrigin,
   type WatchContext,
   type WatchDay,
   type WatchSessionPlan,
@@ -20,6 +22,9 @@ import { useSessionCalibration } from '../cycle/hooks';
 import { useVersions } from '../today/versions';
 import { useHealthImports } from '../health/store';
 import { useWatch } from './store';
+
+/** Where each watch block of a sent plan came from (planId → origins), so a result maps back to block scores. */
+export const sentOrigins = new Map<string, (WatchBlockOrigin | null)[]>();
 
 /**
  * Today on the wrist, built from exactly what the phone's Today shows: the same plan, the same brief and the
@@ -48,15 +53,17 @@ export function useWatchContext(): WatchContext {
     const first = tenant.coach.name.split(' ')[0] ?? '';
     const plans: WatchSessionPlan[] = [...options]
       .sort((a, b) => Number(b.version === recommended) - Number(a.version === recommended))
-      .map((o) =>
-        watchPlanFromSession(o.plan, {
+      .map((o) => {
+        const p = watchPlanFromSession(o.plan, {
           version: o.version,
           units,
           incrementKg,
           calibrate: (kg) => cal.adjust(kg) ?? kg,
           calibrationLine: cal.line,
-        }),
-      );
+        });
+        sentOrigins.set(p.planId, watchBlockOrigins(o.plan));
+        return p;
+      });
     const checkedIn = checks.some((c) => c.date === today);
     const day: WatchDay = done
       ? { kind: 'done', title: done.title, sets: done.sets.length }

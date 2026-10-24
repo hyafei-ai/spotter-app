@@ -15,3 +15,5 @@ export * from './cycle';
 export * from './patterns';
 export * from './coachToday';
 export * from './watch';
+export * from './multisport';
+export * from './sessions';

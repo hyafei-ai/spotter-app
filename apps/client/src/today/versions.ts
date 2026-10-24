@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { router } from 'expo-router';
-import { describeLighter, type SessionPlan } from '@spotter/core';
+import { describeLighter, isStrengthOnly, planSummary, type SessionPlan } from '@spotter/core';
 import { useApp } from '../store';
 import { useDaily } from '../daily/store';
 import { useLighterRule } from '../daily/read';
@@ -32,8 +32,18 @@ export function useVersions(plan: SessionPlan | null, suggestLighter: boolean) {
   const options = useMemo<VersionOption[]>(() => {
     if (!plan) return [];
     const out: VersionOption[] = [
-      { version: 'planned', title: plan.title, detail: `As ${first} planned it · ${plan.exercises.length} exercises`, plan },
-      { version: 'lighter', title: `${plan.title} · easier version`, detail: `${first}’s easier settings: ${describeLighter(rule).toLowerCase()}`, plan: lighterPlan(plan, rule) },
+      {
+        version: 'planned',
+        title: plan.title,
+        detail: `As ${first} planned it · ${isStrengthOnly(plan) ? `${plan.exercises.length} exercises` : planSummary(plan, tenant.units).join(', ')}`,
+        plan,
+      },
+      {
+        version: 'lighter',
+        title: `${plan.title} · easier version`,
+        detail: `${first}’s easier settings: ${describeLighter(rule).toLowerCase()}${isStrengthOnly(plan) ? '' : '. Timed parts stay as written: pace them easier'}`,
+        plan: lighterPlan(plan, rule),
+      },
     ];
     const rec = recoveryPlan(plan.scheduledDate, completed);
     if (rec) out.push({ version: 'recovery', title: rec.title, detail: `${first}’s recovery session instead`, plan: rec });

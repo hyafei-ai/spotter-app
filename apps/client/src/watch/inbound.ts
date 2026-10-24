@@ -1,4 +1,4 @@
-import { parseWatchInbound, watchResultToSession, type WatchCheckIn, type WatchResult } from '@spotter/core';
+import { parseWatchInbound, watchResultToBlockResults, watchResultToSession, type WatchCheckIn, type WatchResult } from '@spotter/core';
 import { DEMO_CLIENT, EMPTY_SHARED_WATCH, coachClientIdFor, watchKey, type SharedWatchDoc } from '@spotter/core/demo';
 import { readShared, writeShared } from '@spotter/ui';
 import { IS_DEMO, tenant } from '../env';
@@ -40,9 +40,12 @@ export async function importSession(result: WatchResult): Promise<'stored' | 'du
   const plan = watch.plans[result.planId];
   if (!plan) return 'ignored';
   const { session, summary } = watchResultToSession(result, plan);
+  // Intervals, race segments and timed pieces with no program exercise behind them come back as block results.
+  const results = watchResultToBlockResults(result, plan, watch.origins?.[result.planId] ?? []);
 
   await syncQueue.enqueue('session.start', { sessionId: session.sessionId, programDayId: plan.programDayId, scheduledDate: session.date, startedAt: session.startedAt });
   for (const s of session.sets) await syncQueue.enqueue('set.log', s);
+  for (const r of results) await syncQueue.enqueue('block.result', r);
   await syncQueue.enqueue('session.finish', { sessionId: session.sessionId, finishedAt: session.finishedAt, feel: null, note: null });
   await syncQueue.enqueue('session.watch', { ...summary, shareWithCoach: watch.shareHr });
   void syncQueue.flush();
@@ -57,6 +60,7 @@ export async function importSession(result: WatchResult): Promise<'stored' | 'du
     note: null,
     sets: session.sets,
     ...(session.variant ? { variant: session.variant } : {}),
+    ...(results.length ? { results } : {}),
   };
   useApp.setState({ completed: [...useApp.getState().completed, done] });
   watch.addSummary({ ...summary, title: session.title, date: session.date });

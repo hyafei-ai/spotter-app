@@ -1,7 +1,9 @@
 # Multisport core: race-format, CrossFit-style and endurance trainers
 
-Batch A of `docs/ports.md` (rows 2, 3, 4, 5 core, 6, 10). Pure functions and data in `packages/core`, with
-tests. **No UI yet.** Every ported feature still goes through the UX gate before it reaches a screen.
+Batch A of `docs/ports.md` (rows 2, 3, 4, 5 core, 6, 10): pure functions and data in `packages/core`, with tests.
+Batch B (rows 1, 2 UI, 3 UI, 5 UI, 7, 8, 9): the block workout model, the block runner, the coach builder, the
+client logger, results, patterns for non-lifters, Strategy & stimulus and race goals, described in
+"Batch B: blocks on screen" below. UX record: `docs/ux/multisport.md`.
 
 ## What exists now, by trainer style
 
@@ -82,16 +84,77 @@ Every one carries `verify: true` and the note "To verify against the current off
 - Recovery/yoga/foam-roll "templates", the partner and chipper templates with unclear distances, and the
   "Elite sim targeting sub-60" template.
 
-## What the block model (row 1) and the UI will add
+## Batch B: blocks on screen
 
-- **Block model (row 1)**: map `ParsedWorkout` and `TemplateWorkout` into blocks with scoring modes (run, rounds for
-  time, AMRAP, interval AMRAP, EMOM, for time, rep scheme, tabata, strength, rest); store parts and scaling levels;
-  decide how `repScheme`, `sets`, `rounds` and "once before/after the rounds" notes become repetition.
-- **Then**: the block runner (row 9), movement trends and bottleneck stations (row 7), the AI brief (row 8).
-- **UI** (each through the UX gate): paste-to-structure review screen with the warnings; template picker; race goal
-  and race-readiness screen; sim results with pacing, roxzone, station bests and compromised running; zones and
-  run types on imported runs; milestones in Celebrate and returns in Check in on Today. Wiring needs: the athlete's
-  fresh 1 km benchmark, coach-set max HR, optional sex/age/resting HR, start dates, race dates.
+### Block model (row 1)
+- `ProgramDay.blocks` (`schemas.ts` `Block`, discriminated on `kind`): strength (points at the day's exercises by id),
+  rounds_for_time, amrap, interval_amrap, emom, for_time, rep_scheme, tabata, intervals (distance or time, pace /
+  watts / RPE target), station_race (run and station segments), timed, rest, note. Every block has `scoring`
+  (time, rounds_reps, load, reps, distance, calories, none), `timeCapSec`, `title`, `note`, `templateId`.
+  Movements carry reps / load / calories / distance with an optional second number (`repsAlt`, `loadKgAlt`,
+  `caloriesAlt`) and `verify` when it came from a template to check.
+- `inferSessionType` / `inferSessionScoring` (port of `inferWorkoutMeta`) name a session from its parts.
+- **Migration, lossless and versioned**: `ProgramDay.v = 2`. `migrateDay` turns a v1 day (exercises only) into one
+  strength block holding every exercise in order; it never drops an exercise (dangling block refs are removed,
+  orphan exercises appended to a strength block) and it is idempotent. A plain strength day resolves to **exactly
+  the old snapshot shape** (`resolveDay` omits `blocks`), so the logger, calibration, timeline, watch and existing
+  SQL see nothing new. Tests: `test/migration.test.ts` (round trip, orphans, idempotence, snapshot identity).
+- **SQL** `20261027010001_blocks.sql`: `program_days.blocks jsonb` (null = old day); `program_snapshot` adds `v`,
+  `blocks` and the approved brief only when present; `session_block_results` (one row per session × block, newer
+  write wins, voidable, RLS: the client writes theirs, their coach reads); `day_briefs` (coach writes; the client
+  reads only `approved` for a day they're assigned); `race_goals` (one live goal per client; client or coach
+  writes); `sync_handle_blocks` for `block.result`, `block.void`, `race.goal.set`, `race.goal.clear`
+  (append-only, idempotent by id); `sync_pull` returns the three new tables. Tests: `94_blocks.test.sql`.
+- Results: `BlockResult` {sessionId, blockId, kind, key, label, scoring, score, splits, rpe, loggedAt}. `blockKey`
+  makes "the same workout" comparable across programs (benchmarks by template id, others by shape).
+- Calibration (cycle-phase loads) only ever touches strength exercises; blocks are never calibrated.
+- Timeline, `sessionLoad`, progress wins, masters wins and the watch contract read block results; a strength-only
+  session produces the same values as before.
+
+### Block runner (row 9)
+`core/blockRunner.ts`: a pure reducer (`runnerReduce`) over events {start, pause, resume, lap, undo, finish} with
+wall-clock timestamps, and `runnerView(spec, state, now)` for what to show. Modes: countdown (AMRAP, timed, rest),
+up (for time, rounds for time, rep scheme, with an optional cap), windows (EMOM, tabata, interval AMRAP, time
+intervals), intervals (distance reps with a rest countdown), segments (race sim with Done and a 5 s undo). 3 s
+lead-in. State is saved with the active session, so a reopened app settles from wall time. `runnerSplits` and
+`runnerScore` prefill score entry; "Done" closes the last round of a for-time block. Tests: `blockRunner.test.ts`.
+
+### Patterns and trends for non-lifters (row 7)
+`core/trends.ts`: `scoreHistories` (each workout against the person's own earlier results, "best yet", trend after
+3), `movementTrends`, `bottleneckStations`. `patterns.ts` adds four gated detectors, each self-comparison only and
+using the existing Welch rule: conditioning vs sleep, conditioning trend, aerobic efficiency (same workout key,
+last 4 weeks vs the 4 before, ≥ `EFFICIENCY_MIN_M`), compromised running in race sims
+(`COMPROMISED_MIN_SIMS` = 4). Named constants: `SCORE_MIN_REPEATS`, `CONDITIONING_MIN_PCT`, `TREND_BLOCK_WEEKS`,
+`EFFICIENCY_WEEKS`.
+
+### Strategy & stimulus (row 8)
+`ai.ts` `buildDayBriefInput` sends **blocks only** (titles, kinds, movements, loads) through `redact()`: no names,
+health data or notes. `DAY_BRIEF_JSON_SCHEMA` / Zod `DayBrief` {stimulus ≤ 400, strategy ≤ 600};
+`functions/ai-day-brief`. Drafts are made when a program with timed parts is published (MOCK in the demo); the coach
+approves, edits or removes per day; the client sees approved text only, on Today ("Strategy & stimulus · from
+{coach}").
+
+### Race goal (row 5 UI)
+Coach: client page → Race → Change (`/client/[id]/race`); client: Me → Race goal. Today shows "{event} in {n}
+days" inside 12 weeks. The coach page shows the finish estimate with its evidence lines and the five readiness
+dimensions, no score.
+
+### MOCK demo clients
+Sasha (race-format, MOCK race "Spring race, Manchester"), Ravi (functional fitness, benchmarks), Ruth (masters
+runner, 58). All sessions and results in `demo/multisport.ts` are MOCK. Client demo: Me → Demo → Today's session
+(sample) swaps in a strength + finisher, AMRAP, benchmark + EMOM, tabata, intervals or race-sim session.
+
+### Copy strings (Batch B)
+Kind lines: "AMRAP · 12 min", "EMOM · 8 minutes", "For time · 21-15-9 · 10 min cap", "Tabata · 8 × 20 s on, 10 s
+off", "Run intervals · 2 min rest · target 4:30/km", "Race simulation · 4 runs, 4 stations". Results: "AMRAP 12:
+7 rounds + 10", "Fran 4:13", "5 × 1 km avg 4:32/km", "26:10 (5:14/km)", "Capped · 2 rounds + 30", "Done",
+"(scaled)". Runner: "+1 round", "Round 2 done", "Rep 3 done", "Rest 1:32", "Done: SkiErg", "Undo (5 s)", "Undo last
+round", "Cap in 7:05", "Minute 2 of 8", "Run 2 · 1 km", "Next: …", "End early", "End without finishing". Score:
+"Your score", "Nice work", "Your time", "Hit the 10:00 time cap", "Stopped partway through a round?", "After
+burpee · +10", "Scaled (not as written)", "How hard was it? (optional)". Builder: "Add to this session", "Check the
+standard", "Check before you send", "Check against the current official standard", "Draft · clients don't see
+it", "Drafted by AI from this session's parts only. Check it before you approve.", "Strategy & stimulus drafted
+for {n} session(s): approve it in the day."
 
 ## Copy strings for the UI builder to review
 

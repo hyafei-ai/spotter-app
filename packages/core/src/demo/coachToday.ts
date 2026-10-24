@@ -18,6 +18,7 @@ import {
   demoWins,
 } from './patterns';
 import type { ClientDay } from '../timeline';
+import { MULTISPORT_CLIENT_IDS } from './multisport';
 import type { PlannedDay } from '../coachToday';
 import type { Pattern } from '../patterns';
 import type { MastersWin } from '../masters';
@@ -161,7 +162,7 @@ export function demoRosterDays(
   const n = opts.days ?? 56;
   if (isSampleClient(clientId))
     return demoClientDays(DEMO_JORDAN_ID, now, { includeCycle: true }).slice(-n);
-  if (clientId === DEMO_JORDAN_ID || clientId === DEMO_MEI_ID)
+  if (clientId === DEMO_JORDAN_ID || clientId === DEMO_MEI_ID || MULTISPORT_CLIENT_IDS.includes(clientId))
     return demoClientDays(clientId, now, { includeCycle: opts.includeCycle }).slice(-n);
   return lightDays(clientId, now, n);
 }

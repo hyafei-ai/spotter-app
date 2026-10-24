@@ -3,6 +3,8 @@ import { relativePerformance, sessionBestE1rms } from './calibration';
 import { healthSourceLabel } from './fuel';
 import { isMobilityActivity, mergeMobility, type MobilitySession } from './mobility';
 import { SHORT_SLEEP_HOURS, sessionLoad, type CyclePhase, type DailyCheck } from './signals';
+import { resultLine, scoreValue } from './blocks';
+import type { BlockKind, BlockResult, BlockScore, BlockSplit, ScoringMode } from './schemas';
 import { dedupeImported, hrvStatus, importedWorkoutLoad, maxObservedHr, restingHrStatus, RESTING_HR_HIGH_BPM } from './wearables';
 import {
   IMPORTED_ACTIVITY_LABEL,
@@ -72,6 +74,23 @@ export interface TimelineSession {
   bests?: Record<string, number>;
   /** Hard sets per main group. Spotter only. */
   groupSets?: Record<string, number>;
+  /** Scored blocks (WODs, intervals, race sims) in this session. Spotter only; absent for strength-only sessions. */
+  scores?: TimelineScore[];
+}
+
+/** One block result as the timeline keeps it (docs/features/multisport-core.md). */
+export interface TimelineScore {
+  key: string;
+  label: string;
+  kind: BlockKind;
+  scoring: ScoringMode;
+  /** Bigger is better (blocks.ts scoreValue); null when there's nothing to compare. */
+  value: number | null;
+  /** "Fran 4:12", "5 × 1 km avg 4:31/km". */
+  text: string;
+  timeSec: number | null;
+  score: BlockScore;
+  splits: BlockSplit[];
 }
 
 export interface ClientDay {
@@ -109,6 +128,8 @@ export interface ClientDay {
 export interface TimelineSessionInput extends CalibrationSession {
   title?: string;
   durationMin?: number | null;
+  /** Block results logged in the session (WOD scores, interval and race splits). */
+  blocks?: Pick<BlockResult, 'key' | 'label' | 'kind' | 'scoring' | 'score' | 'splits' | 'rpe'>[];
   /** Start time on the client's clock ("2026-10-20T07:30…"); only the hour is read, as written. */
   startedAt?: string | null;
   id?: string;
@@ -142,8 +163,10 @@ function hourOf(startedAt: string | null | undefined): number | null {
 }
 
 function spotterSession(s: TimelineSessionInput, deltaPct: number | null): TimelineSession {
-  const minutes = Math.round(s.durationMin ?? s.sets.length * MINUTES_PER_SET_ESTIMATE);
-  const rpes = s.sets.map((x) => x.rpe).filter((x): x is number => x != null);
+  const blocks = s.blocks ?? [];
+  const blockMin = blocks.reduce((a, b) => a + (b.score.timeSec ?? b.splits.reduce((x, sp) => x + sp.sec, 0)) / 60, 0);
+  const minutes = Math.round(s.durationMin ?? s.sets.length * MINUTES_PER_SET_ESTIMATE + blockMin);
+  const rpes = [...s.sets.map((x) => x.rpe), ...blocks.map((b) => b.rpe)].filter((x): x is number => x != null);
   const rpe = rpes.length ? r1(rpes.reduce((a, b) => a + b, 0) / rpes.length) : FEEL_RPE(s.feel);
   const hard = s.sets.filter((x) => x.rpe == null || x.rpe >= 7);
   const groupSets: Record<string, number> = {};
@@ -157,7 +180,7 @@ function spotterSession(s: TimelineSessionInput, deltaPct: number | null): Timel
     source: 'spotter',
     title: s.title ?? 'Session',
     minutes,
-    load: sessionLoad(minutes, s.feel),
+    load: sessionLoad(minutes, s.feel, rpes.length ? rpe : null),
     hardSets: hard.length,
     muscles: Object.keys(groupSets),
     rpe,
@@ -165,6 +188,21 @@ function spotterSession(s: TimelineSessionInput, deltaPct: number | null): Timel
     deltaPct: deltaPct == null ? null : r1(deltaPct),
     bests,
     groupSets,
+    ...(blocks.length
+      ? {
+          scores: blocks.map((b) => ({
+            key: b.key,
+            label: b.label,
+            kind: b.kind,
+            scoring: b.scoring,
+            value: scoreValue(b),
+            text: resultLine(b),
+            timeSec: b.score.timeSec,
+            score: b.score,
+            splits: b.splits,
+          })),
+        }
+      : {}),
   };
 }
 

@@ -2,6 +2,9 @@ import { STARTER_LIBRARY } from './library';
 import { estimatedOneRepMax } from './records';
 import type { CalibrationInput, CalibrationSession } from './physiology';
 import type { CyclePhase } from './signals';
+import { scoreText, scoreValue } from './blocks';
+import { formatRaceTime } from './hyrox';
+import type { ScoredSession } from './trends';
 
 /**
  * Progress beyond raw PRs (docs/features/brief.md). Raw one-rep-max PRs get rare after the first
@@ -26,7 +29,7 @@ export const PHASE_ADJECTIVE: Record<CyclePhase, string> = {
   luteal: 'luteal-phase',
 };
 
-export type WinKind = 'raw_best' | 'phase_best' | 'rep_best';
+export type WinKind = 'raw_best' | 'phase_best' | 'rep_best' | 'score_best';
 
 export interface ProgressWin {
   kind: WinKind;
@@ -147,10 +150,35 @@ export function phaseBests(sessions: CalibrationSession[], phaseOn: CalibrationI
   return out;
 }
 
+/**
+ * A new best on a scored block (a benchmark, an interval set, a race sim), compared only with earlier results of the
+ * same piece of work and scoring. Needs an earlier result to beat. `exerciseId` holds the block key.
+ */
+export function scoreBests(sessions: ScoredSession[]): ProgressWin[] {
+  const out: ProgressWin[] = [];
+  const seen = new Map<string, number>();
+  for (const s of [...sessions].sort((a, b) => a.date.localeCompare(b.date))) {
+    for (const r of s.results) {
+      const v = scoreValue(r);
+      if (v == null || r.scoring === 'none') continue;
+      const k = `${r.key}|${r.scoring}`;
+      const prev = seen.get(k);
+      if (prev != null && v > prev) {
+        const by = r.scoring === 'time' && !r.score.capped && prev > -1e6 ? `, ${formatRaceTime(v - prev)} faster than your best` : ', a new best';
+        out.push({ kind: 'score_best', date: s.date, exerciseId: r.key, text: `${r.label} ${scoreText(r)}${by}`, value: v, previous: prev });
+      }
+      if (prev == null || v > prev) seen.set(k, v);
+    }
+  }
+  return out;
+}
+
 export interface WinsInput {
   sessions: CalibrationSession[];
   phaseOn: CalibrationInput['phaseOn'] | null;
   names?: Record<string, string>;
+  /** Scored blocks, for benchmark and interval bests. */
+  scored?: ScoredSession[];
 }
 
 /**
@@ -162,8 +190,9 @@ export function progressWins(input: WinsInput): ProgressWin[] {
   const rawKeys = new Set(raw.map((w) => `${w.date}|${w.exerciseId}`));
   const phase = phaseBests(input.sessions, input.phaseOn, input.names).filter((w) => !rawKeys.has(`${w.date}|${w.exerciseId}`));
   const reps = repBests(input.sessions, input.names);
-  const order: Record<WinKind, number> = { raw_best: 0, phase_best: 1, rep_best: 2 };
-  return [...raw, ...phase, ...reps].sort((a, b) => b.date.localeCompare(a.date) || order[a.kind] - order[b.kind]);
+  const scores = scoreBests(input.scored ?? []);
+  const order: Record<WinKind, number> = { raw_best: 0, score_best: 1, phase_best: 2, rep_best: 3 };
+  return [...raw, ...scores, ...phase, ...reps].sort((a, b) => b.date.localeCompare(a.date) || order[a.kind] - order[b.kind]);
 }
 
 /* ---------- estimated-max trend ---------- */

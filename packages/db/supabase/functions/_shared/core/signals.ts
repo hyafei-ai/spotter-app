@@ -47,9 +47,14 @@ export type DailyCheck = z.infer<typeof DailyCheck>;
 /** Session RPE from the finish screen's "how did it feel" (1 rough … 5 great). An approximation, labelled as such. */
 const FEEL_TO_RPE: Record<number, number> = { 1: 9, 2: 8, 3: 7, 4: 6, 5: 5 };
 
-export function sessionLoad(durationMin: number, feel: number | null): number {
-  const rpe = feel != null ? (FEEL_TO_RPE[feel] ?? 7) : 7;
-  return Math.max(0, Math.round(durationMin)) * rpe;
+/**
+ * Session load: minutes × session RPE. A logged session RPE (from block results or set RPEs) wins over the
+ * finish-screen feel; with neither, RPE 7 is assumed. Works for every block kind: minutes are the session's real
+ * duration (or the timeline's estimate from sets and block times).
+ */
+export function sessionLoad(durationMin: number, feel: number | null, rpe: number | null = null): number {
+  const r = rpe != null && rpe >= 1 && rpe <= 10 ? rpe : feel != null ? (FEEL_TO_RPE[feel] ?? 7) : 7;
+  return Math.round(Math.max(0, Math.round(durationMin)) * r);
 }
 
 export type LoadStatus = 'spike' | 'drop' | 'steady' | 'unknown';

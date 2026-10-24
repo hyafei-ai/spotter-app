@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { formatDuration, summarize } from '@spotter/core';
+import { blockLabel, formatDuration, isStrengthOnly, needsResult, planBlocks, resultLine, scoreBests, summarize } from '@spotter/core';
+import { tenant } from '../../../src/env';
 import { Button, ListRow, SectionLabel, SegmentedControl, Tally, Text, TextField, margin, space, useTheme, Screen } from '@spotter/ui';
 import { SyncBanner } from '../../../src/SyncBanner';
 import { w } from '../../../src/format';
@@ -24,7 +25,17 @@ export default function Finish() {
     () => (session ? summarize(session.plan, session.sets, session.startedAt, finishedAt, completed.flatMap((s) => s.sets)) : null),
     [session, finishedAt, completed],
   );
+  const results = useMemo(() => session?.results ?? [], [session?.results]);
+  // New bests on scored blocks: only against earlier results of the same workout (none to beat, none shown).
+  const bests = useMemo(() => {
+    if (!session) return [];
+    const history = completed.filter((c) => c.results?.length).map((c) => ({ date: c.startedAt, results: c.results! }));
+    const nowIso = new Date().toISOString();
+    return scoreBests([...history, { date: nowIso, results }]).filter((w) => w.date === nowIso);
+  }, [session, completed, results]);
   if (!session || !sum) return null;
+  const strengthOnly = isStrengthOnly(session.plan);
+  const missingBlocks = planBlocks(session.plan).filter(needsResult).filter((b) => !results.some((r) => r.blockId === b.id));
 
   const finish = async () => {
     setSaving(true);
@@ -41,7 +52,7 @@ export default function Finish() {
       footer={
         <>
           <Button label="Finish session" onPress={() => void finish()} loading={saving} />
-          {sum.unlogged.length ? <Button label="Go back and log them" kind="quiet" onPress={() => router.back()} /> : null}
+          {sum.unlogged.length || missingBlocks.length ? <Button label="Go back and log them" kind="quiet" onPress={() => router.back()} /> : null}
         </>
       }
     >
@@ -50,9 +61,18 @@ export default function Finish() {
           {session.plan.title}
         </Text>
         <View style={{ paddingVertical: space[2] }}>
-          <Tally count={sum.setsLogged} />
+          <Tally count={sum.setsLogged + results.length} />
         </View>
       </View>
+
+      {missingBlocks.length ? (
+        <View accessibilityRole="alert" style={[styles.warn, { borderLeftColor: colors.warning, backgroundColor: colors.surface }]}>
+          <Text variant="bodyStrong">{`${missingBlocks.map(blockLabel).join(', ')} ${missingBlocks.length === 1 ? 'has' : 'have'} no score`}</Text>
+          <Text variant="callout" color="ink2">
+            Finish anyway if you skipped it, or go back and enter it.
+          </Text>
+        </View>
+      ) : null}
 
       {sum.unlogged.length ? (
         <View accessibilityRole="alert" style={[styles.warn, { borderLeftColor: colors.warning, backgroundColor: colors.surface }]}>
@@ -67,12 +87,21 @@ export default function Finish() {
 
       <View style={styles.stats}>
         <Stat label="Time" value={formatDuration(sum.durationS)} />
-        <Stat label="Sets" value={`${sum.setsLogged} of ${sum.setsPlanned}`} />
-        <Stat label="Volume" value={w(sum.volumeKg)} />
+        {sum.setsPlanned ? <Stat label="Sets" value={`${sum.setsLogged} of ${sum.setsPlanned}`} /> : null}
+        {sum.volumeKg ? <Stat label="Volume" value={w(sum.volumeKg)} /> : null}
       </View>
 
-      <SectionLabel>Personal records</SectionLabel>
-      {sum.records.length ? (
+      {!strengthOnly && results.length ? (
+        <>
+          <SectionLabel>Scores</SectionLabel>
+          {results.map((r, i) => (
+            <ListRow key={r.blockId} title={resultLine(r, tenant.units)} subtitle={bests.find((b) => b.exerciseId === r.key)?.text ?? undefined} last={i === results.length - 1} />
+          ))}
+        </>
+      ) : null}
+
+      {sum.setsPlanned ? <SectionLabel>Personal records</SectionLabel> : null}
+      {!sum.setsPlanned ? null : sum.records.length ? (
         sum.records.map((r, i) => (
           <ListRow
             key={`${r.exerciseId}-${r.type}`}

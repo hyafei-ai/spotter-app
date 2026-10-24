@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { programSummary, searchLibrary, type Program } from '@spotter/core';
-import { Button, EmptyState, ListRow, Screen, ScreenHeader, SectionLabel, SegmentedControl, Tag, Text, TextField, margin, space } from '@spotter/ui';
+import { Button, EmptyState, ListRow, Screen, ScreenHeader, SectionLabel, SegmentedControl, Tag, Text, TextField, useTheme, margin, radius, space } from '@spotter/ui';
 import { assignedCount, useLibrary, usePrograms } from '../../src/programs';
 import { Chips } from '../../src/programUi';
+import { useStyles } from '../../src/multisport/styles';
 
 /** K-4 Programs tab: the coach's programs and templates, and their exercise library. */
 export default function Programs() {
@@ -29,7 +30,9 @@ export default function Programs() {
 }
 
 function ProgramList() {
-  const { programs, assignments, createProgram } = usePrograms();
+  const { programs: all, assignments, createProgram } = usePrograms();
+  // "Single sessions" holders (sessions sent one date at a time) aren't programs to edit; they show on each client.
+  const programs = all.filter((p) => p.weeks.length > 0 || p.status !== 'published');
   // Grouped by what the coach needs to know: not visible yet, followed by clients now, or ready to assign.
   const drafts = programs.filter((p) => p.status === 'draft');
   const live = programs.filter((p) => p.status === 'published' && assignedCount(assignments, p.id) > 0);
@@ -54,11 +57,30 @@ function ProgramList() {
     );
   };
 
+  const quick = (
+    <View style={styles.actions}>
+      <View style={{ flex: 1 }}>
+        <Button label="Paste a workout" icon="clipboard" kind="secondary" onPress={() => router.push('/paste')} accessibilityHint="Turn whiteboard text into a session and send it to a client" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Button label="Templates" icon="book-open" kind="secondary" onPress={() => router.push('/templates')} accessibilityHint="Benchmarks, race simulations and runs" />
+      </View>
+    </View>
+  );
+
   if (programs.length === 0) {
-    return <EmptyState message="No programs yet. Build your first one and assign it to a client." actionLabel="New program" onAction={create} />;
+    return (
+      <>
+        <StylesCard />
+        {quick}
+        <EmptyState message="No programs yet. Build your first one and assign it to a client." actionLabel="New program" onAction={create} />
+      </>
+    );
   }
   return (
     <>
+      <StylesCard />
+      {quick}
       {drafts.length ? (
         <>
           <SectionLabel>Drafts · not visible to clients</SectionLabel>
@@ -81,6 +103,26 @@ function ProgramList() {
         <Button label="New program" icon="plus" kind="secondary" onPress={create} />
       </View>
     </>
+  );
+}
+
+/** Asked once, where it pays off; skippable (docs/ux/multisport.md section 6). */
+function StylesCard() {
+  const { colors } = useTheme();
+  const answered = useStyles((s) => s.answered);
+  const skip = useStyles((s) => s.skip);
+  if (answered) return null;
+  return (
+    <View style={[styles.card, { borderColor: colors.line, backgroundColor: colors.surface }]}>
+      <Text variant="bodyStrong">How do you coach?</Text>
+      <Text variant="callout" color="ink2">
+        Strength, hybrid and race-format, WODs, endurance or general fitness. Your styles come first when you build. Nothing is hidden either way.
+      </Text>
+      <View style={styles.cardRow}>
+        <Button label="Choose" kind="secondary" full={false} onPress={() => router.push('/styles')} />
+        <Button label="Not now" kind="quiet" full={false} onPress={skip} />
+      </View>
+    </View>
   );
 }
 
@@ -138,4 +180,6 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: margin, paddingTop: space[4] },
   actions: { flexDirection: 'row', gap: space[3], paddingHorizontal: margin, paddingTop: space[2] },
   caption: { paddingHorizontal: margin, paddingTop: space[3] },
+  card: { marginHorizontal: margin, marginTop: space[2], padding: space[3], borderWidth: StyleSheet.hairlineWidth * 2, borderRadius: radius.sheet, gap: space[1] },
+  cardRow: { flexDirection: 'row', gap: space[2], marginTop: space[1] },
 });

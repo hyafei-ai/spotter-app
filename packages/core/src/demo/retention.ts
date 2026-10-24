@@ -38,6 +38,10 @@ const SHAPES: Shape[] = [
   { weeks: steady(4, 3), openedDaysAgo: 0, sessionDaysAgo: 2, easeReadsRecent: 5, easeReadsBefore: 1, checkInsMissed: 2 },
   { weeks: steady(0, 0), openedDaysAgo: 20, sessionDaysAgo: 35, easeReadsRecent: 0, easeReadsBefore: 0, checkInsMissed: 0 },
   { weeks: steady(3, 2), openedDaysAgo: 2, sessionDaysAgo: 2, easeReadsRecent: 1, easeReadsBefore: 0, checkInsMissed: 0 },
+  // Multisport demo clients: steady.
+  { weeks: steady(4, 4), openedDaysAgo: 0, sessionDaysAgo: 2, easeReadsRecent: 0, easeReadsBefore: 0, checkInsMissed: 0 },
+  { weeks: steady(5, 5), openedDaysAgo: 0, sessionDaysAgo: 1, easeReadsRecent: 0, easeReadsBefore: 1, checkInsMissed: 0 },
+  { weeks: steady(3, 3), openedDaysAgo: 1, sessionDaysAgo: 3, easeReadsRecent: 0, easeReadsBefore: 0, checkInsMissed: 0 },
 ];
 
 const planName = (planId: string) => DEMO_PLANS.find((p) => p.id === planId)?.name ?? null;

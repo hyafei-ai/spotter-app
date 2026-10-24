@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { WEEKDAY_LONG, copyWeek, move, newDay, programProblems, programSummary, uuidv7, type Program } from '@spotter/core';
+import { WEEKDAY_LONG, copyWeek, dayContentNames, move, newDay, programProblems, programSummary, uuidv7, type Program } from '@spotter/core';
 import { Banner, Button, EmptyState, IconButton, ListRow, Screen, SectionLabel, Sheet, Tag, Text, TextField, useTheme, useToast, margin, space } from '@spotter/ui';
 import { assignedCount, useEditing, usePrograms } from '../../../src/programs';
 import { WeekdayPicker } from '../../../src/programUi';
@@ -50,12 +50,13 @@ export default function ProgramEditor() {
       return;
     }
     setProblems([]);
+    const drafts = res.briefDrafts ? ` Strategy & stimulus drafted for ${res.briefDrafts} session${res.briefDrafts === 1 ? '' : 's'}: approve ${res.briefDrafts === 1 ? 'it' : 'them'} in the day.` : '';
     toast({
-      message: publishIt
+      message: (publishIt
         ? 'Published. You can assign it now.'
         : n
           ? `Saved. ${n === 1 ? 'Your client gets' : `${n} clients get`} the changes from their next session.`
-          : 'Saved.',
+          : 'Saved.') + drafts,
     });
   };
 
@@ -169,7 +170,7 @@ export default function ProgramEditor() {
                   <ListRow
                     key={d.id}
                     title={`${WEEKDAY_LONG[d.weekday - 1]} · ${d.title || 'Untitled'}`}
-                    subtitle={d.exercises.length ? d.exercises.map((e) => e.name).join(', ') : 'No exercises yet'}
+                    subtitle={dayContentNames(d).length ? dayContentNames(d).join(', ') : 'Nothing in it yet'}
                     reason={problem ? 'Needs attention' : undefined}
                     chevron
                     onPress={() => router.push(`/program/${id}/day/${d.id}`)}

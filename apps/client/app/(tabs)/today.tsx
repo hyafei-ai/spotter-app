@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import type { DailyBrief, DailyCheck, SessionPlan } from '@spotter/core';
+import { blockMinutes, isStrengthOnly, needsResult, planBlocks, planSummary, sessionProgress, type DailyBrief, type DailyCheck, type SessionPlan } from '@spotter/core';
 import { Button, EmptyState, Screen, SectionLabel, Sheet, Skeleton, Tag, Text, Tally, useTheme, margin, radius, space } from '@spotter/ui';
 import { isoDay } from '@spotter/core/demo';
 import { SyncBanner } from '../../src/SyncBanner';
@@ -19,6 +19,7 @@ import { useSessionCalibration } from '../../src/cycle/hooks';
 import { useCycleDailyRefresh } from '../../src/cycle/CycleRow';
 import { FeelLine, ReasonChips, TodoLines } from '../../src/today/BriefHero';
 import { useVersions, type VersionOption } from '../../src/today/versions';
+import { countdownLine, useMyRaceGoal } from '../../src/race/store';
 
 /** MOCK DATA: the coach's rest-day mobility suggestion; real builds read it from the program. */
 const REST_DAY_MOBILITY: MobilitySuggestion = { title: 'Hip and ankle mobility', minutes: 10, routineId: 'mock-hips-ankles' };
@@ -59,7 +60,8 @@ export default function Today() {
 
   // App was killed mid-session: offer to pick up exactly where it was (UX H6).
   if (active) {
-    const planned = active.plan.exercises.reduce((n, e) => n + e.sets.length, 0);
+    const p = sessionProgress(active.plan, active.sets, active.results ?? []);
+    const strength = isStrengthOnly(active.plan);
     return (
       <Screen banner={<SyncBanner />} footer={<Button label="Resume session" onPress={() => router.push(`/session/${active.sessionId}`)} />}>
         <View style={styles.head}>
@@ -68,7 +70,7 @@ export default function Today() {
             {active.plan.title}
           </Text>
           <Text color="ink2">
-            {active.sets.length} of {planned} sets logged. Everything is saved on your phone.
+            {strength ? `${active.sets.length} of ${p.planned} sets logged.` : `${p.done} of ${p.planned} done.`} Everything is saved on your phone.
           </Text>
         </View>
       </Screen>
@@ -154,6 +156,7 @@ function SessionDay({ plan, first }: { plan: SessionPlan; first: string }) {
     >
       <View style={styles.head}>
         <Kicker text={`${shortDay(plan.scheduledDate)} · ${plan.title}`} />
+        <RaceCountdown />
         {hasRead ? <FeelLine text={brief.feel} tone={brief.tone} /> : <Text variant="display" accessibilityRole="header">{plan.title}</Text>}
       </View>
       {hasRead ? (
@@ -168,6 +171,18 @@ function SessionDay({ plan, first }: { plan: SessionPlan; first: string }) {
       <DueItems />
       <VersionSheet visible={sheet} options={options} recommended={recommended} onClose={() => setSheet(false)} onPick={(o) => void go(o)} />
     </Screen>
+  );
+}
+
+/** "Spring race in 23 days": only inside 12 weeks of a race the client or coach set. */
+function RaceCountdown() {
+  const { goal } = useMyRaceGoal();
+  const line = countdownLine(goal);
+  if (!line) return null;
+  return (
+    <Text variant="bodyStrong" accessibilityLabel={`Race countdown: ${line}`}>
+      {line}
+    </Text>
   );
 }
 
@@ -225,14 +240,23 @@ function CheckInRow({ check }: { check: DailyCheck | null }) {
 
 function SessionBlock({ plan, first, recommended, brief, calibrationLine }: { plan: SessionPlan; first: string; recommended: string; brief: DailyBrief; calibrationLine: string | null }) {
   const { colors } = useTheme();
-  const names = plan.exercises.map((e) => e.name);
-  const minutes = Math.round(plan.exercises.reduce((n, e) => n + e.sets.length, 0) * 2.5 / 5) * 5;
+  const names = planSummary(plan, tenant.units);
+  const blocks = planBlocks(plan);
+  const setMinutes = plan.exercises.reduce((n, e) => n + e.sets.length, 0) * 2.5;
+  const raw = setMinutes + blocks.reduce((n, b) => n + blockMinutes(b), 0);
+  // Short sessions say the minutes as they are ("about 12 min"); longer ones round to 5.
+  const minutes = raw < 20 ? Math.round(raw) : Math.round(raw / 5) * 5;
+  const n = plan.exercises.length;
+  const timed = blocks.filter(needsResult).length;
+  const parts = isStrengthOnly(plan)
+    ? `${n} exercises`
+    : [n ? `${n} exercise${n === 1 ? '' : 's'}` : null, timed ? `${timed} timed part${timed === 1 ? '' : 's'}` : null].filter(Boolean).join(' + ');
   return (
     <View>
       <SectionLabel right={recommended === 'lighter' ? <Tag label="Easier version suggested" tone="brand" /> : undefined}>Today’s session</SectionLabel>
       <View style={[styles.block, { gap: space[2] }]}>
         <Text variant="headline">{plan.title}</Text>
-        <Text variant="callout" color="ink2">{`${plan.exercises.length} exercises · about ${Math.max(20, minutes)} min`}</Text>
+        <Text variant="callout" color="ink2">{`${parts} · about ${Math.max(5, minutes)} min`}</Text>
         <Text variant="callout" numberOfLines={3}>
           {names.join(' · ')}
         </Text>
@@ -240,6 +264,15 @@ function SessionBlock({ plan, first, recommended, brief, calibrationLine }: { pl
           <View style={[styles.note, { borderLeftColor: colors.brand }]}>
             <Text variant="caption" color="ink2">{`From ${first}`}</Text>
             <Text variant="callout">{plan.coachNote}</Text>
+          </View>
+        ) : null}
+        {plan.brief ? (
+          <View style={[styles.note, { borderLeftColor: colors.brand }]} accessibilityLabel={`Strategy and stimulus from ${first}. ${plan.brief.stimulus} ${plan.brief.strategy}`}>
+            <Text variant="caption" color="ink2">{`Strategy & stimulus · from ${first}`}</Text>
+            <Text variant="callout">{plan.brief.stimulus}</Text>
+            <Text variant="callout" color="ink2">
+              {plan.brief.strategy}
+            </Text>
           </View>
         ) : null}
         {calibrationLine && recommended === 'planned' ? (

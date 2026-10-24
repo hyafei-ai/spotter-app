@@ -1,8 +1,9 @@
 import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { formatDuration } from '@spotter/core';
+import { BLOCK_KIND_LABEL, formatDuration, formatRaceTime, paceText, scoreText } from '@spotter/core';
+import { tenant } from '../../src/env';
 import { LOWER_A } from '@spotter/core/demo';
-import { EmptyState, IconButton, SetRow, Text, margin, space, Screen } from '@spotter/ui';
+import { EmptyState, IconButton, SetRow, StrikeUnder, Text, margin, space, Screen, useTheme } from '@spotter/ui';
 import { longDate, resultText, targetText } from '../../src/format';
 import { useApp } from '../../src/store';
 
@@ -10,6 +11,7 @@ import { useApp } from '../../src/store';
 export default function SessionLog() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const s = useApp((st) => st.completed.find((c) => c.sessionId === id));
+  const { colors } = useTheme();
   const back = <IconButton icon="arrow-left" label="Back" onPress={() => router.back()} />;
   if (!s) {
     return (
@@ -51,6 +53,35 @@ export default function SessionLog() {
           </View>
         );
       })}
+      {(s.results ?? []).map((r) => (
+        <View key={r.blockId} style={{ paddingTop: space[5] }}>
+          <Text variant="label" color="ink2" style={{ paddingHorizontal: margin }}>
+            {r.kind === 'rep_scheme' && r.scoring === 'time' ? 'For time' : BLOCK_KIND_LABEL[r.kind]}
+          </Text>
+          <Text variant="headline" style={{ paddingHorizontal: margin }}>
+            {r.label}
+          </Text>
+          <View style={{ paddingHorizontal: margin, paddingTop: space[1] }}>
+            <Text variant="figure" tabular>
+              {scoreText(r, tenant.units)}
+            </Text>
+            <StrikeUnder width={120} />
+          </View>
+          {r.splits.map((x) => (
+            <View key={x.index} style={[styles.split, { borderBottomColor: colors.line }]}>
+              <Text variant="callout" style={{ flex: 1 }}>
+                {x.name}
+              </Text>
+              <Text variant="bodyStrong" tabular>
+                {formatRaceTime(x.sec)}
+              </Text>
+              <Text variant="caption" color="ink2" tabular style={{ width: 84, textAlign: 'right' }}>
+                {x.distanceM && x.distanceM >= 150 && (x.kind === 'interval' || x.kind === 'run') ? paceText((x.sec / x.distanceM) * 1000) : ''}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ))}
     </Screen>
   );
 }
@@ -58,4 +89,5 @@ export default function SessionLog() {
 const styles = StyleSheet.create({
   nav: { paddingHorizontal: space[2], paddingTop: space[2] },
   head: { paddingHorizontal: margin, gap: space[1] },
+  split: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: margin, paddingVertical: space[2], borderBottomWidth: StyleSheet.hairlineWidth, minHeight: 44 },
 });

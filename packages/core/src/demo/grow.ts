@@ -110,6 +110,8 @@ export function demoSubscriptions(now = Date.now()): (SubscriptionLike & { planI
     { planId: 'plan-12-weeks', clientId: c[5]!.id, planKind: 'pay_in_full', priceCents: 42000, durationWeeks: 12, status: 'active', startedAt: daysAgo(50, now), trialEndsAt: null, canceledAt: null },
     monthly(c[6]!.id, 282, { status: 'paused' }),
     { ...monthly(c[7]!.id, 83), planKind: 'weekly', priceCents: 4500 },
+    // Multisport demo clients (demo/multisport.ts).
+    ...[c[8], c[9], c[10]].filter((x): x is NonNullable<typeof x> => !!x).map((x, i) => monthly(x.id, [172, 249, 354][i]!)),
     // Former clients (ended subscriptions) and trials that didn't convert.
     monthly('former-1', 300, { status: 'canceled', canceledAt: daysAgo(120, now) }),
     monthly('former-2', 210, { status: 'canceled', canceledAt: daysAgo(40, now) }),
