@@ -26,3 +26,32 @@ jobs:
         run: bash scripts/build-web.sh
       - name: Maestro flows parse (they run on a simulator, not in CI)
         run: node scripts/check-maestro.mjs
+
+  ios-project:
+    # Generates each demo trainer's iOS project (iPhone + Apple Watch targets) on Linux, with no Apple account,
+    # and checks no watch surface says Spotter. Compiling still happens on EAS (TestFlight workflow).
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tenant: [maya-reyes-strength, north-shore-barbell]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install --quiet pillow
+      - run: python3 scripts/make-tenant-icons.py --watch ${{ matrix.tenant }}
+      - name: expo prebuild (iOS, with the watch)
+        working-directory: apps/client
+        env:
+          TENANT_ID: ${{ matrix.tenant }}
+          SPOTTER_WATCH: '1'
+          BUILD_NUMBER: '1'
+        run: npx expo prebuild -p ios --no-install
+      - run: node scripts/check-watch-whitelabel.mjs --generated apps/client/ios/SpotterWatch

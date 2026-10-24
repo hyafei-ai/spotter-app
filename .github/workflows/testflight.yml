@@ -1,0 +1,105 @@
+name: TestFlight
+
+# Builds one trainer's iPhone app (with their Apple Watch app inside) on EAS and sends it to TestFlight.
+# Run it from GitHub: Actions → TestFlight → Run workflow. One-time setup: docs/release/testflight.md.
+on:
+  workflow_dispatch:
+    inputs:
+      tenant:
+        description: Trainer (tenant slug)
+        required: true
+        default: maya-reyes-strength
+      asc_app_id:
+        description: App Store Connect app id for this trainer's app (numbers only, App Information page)
+        required: true
+      eas_project_id:
+        description: EAS project id for this trainer's app (expo.dev → the project → Project ID)
+        required: true
+      version:
+        description: Version shown in TestFlight (e.g. 0.1.0)
+        required: true
+        default: 0.1.0
+      watch:
+        description: Include the Apple Watch app
+        type: boolean
+        default: true
+
+concurrency:
+  group: testflight-${{ inputs.tenant }}
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      TENANT_ID: ${{ inputs.tenant }}
+      APP_VERSION: ${{ inputs.version }}
+      # Unique and always increasing, so TestFlight never rejects a duplicate build number.
+      BUILD_NUMBER: ${{ github.run_number }}
+      SPOTTER_WATCH: ${{ inputs.watch && '1' || '' }}
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # Each trainer's app is its own EAS project (EAS checks the project's slug against the app's).
+      EAS_PROJECT_ID: ${{ inputs.eas_project_id }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      EXPO_ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      EXPO_ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check secrets are set
+        run: |
+          missing=""
+          for v in EXPO_TOKEN EXPO_APPLE_TEAM_ID EXPO_ASC_KEY_ID EXPO_ASC_ISSUER_ID ASC_KEY_P8; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then echo "Missing secrets:$missing (see docs/release/testflight.md)"; exit 1; fi
+
+      - name: Same checks as CI
+        run: |
+          pnpm typecheck
+          pnpm --filter @spotter/core test
+
+      - name: Watch icons and white-label check
+        if: ${{ inputs.watch }}
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 scripts/make-tenant-icons.py --watch "$TENANT_ID"
+          node scripts/check-watch-whitelabel.mjs
+
+      - name: App Store Connect key and submit profile
+        env:
+          ASC_APP_ID: ${{ inputs.asc_app_id }}
+        run: |
+          printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+          chmod 600 "$RUNNER_TEMP/asc.p8"
+          echo "EXPO_ASC_API_KEY_PATH=$RUNNER_TEMP/asc.p8" >> "$GITHUB_ENV"
+          # The checkout is throwaway, so the trainer's app id is written into this run's eas.json only.
+          node -e '
+            const fs = require("fs"); const p = "apps/client/eas.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.submit = j.submit || {}; j.submit.testflight = { ios: { ascAppId: process.env.ASC_APP_ID } };
+            fs.writeFileSync(p, JSON.stringify(j, null, 2));'
+
+      - name: Commit this run's inputs locally (EAS uploads from git; nothing is pushed)
+        run: |
+          git add -A apps/client
+          git -c user.name="TestFlight run" -c user.email="ci@localhost" commit --quiet --no-verify -m "TestFlight inputs for $TENANT_ID (local to this run)" || true
+
+      - name: Build on EAS and send to TestFlight
+        working-directory: apps/client
+        run: npx --yes eas-cli@16 build --platform ios --profile production --non-interactive --wait --auto-submit-with-profile testflight
+
+      - name: Remove the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/asc.p8"
